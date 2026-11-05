@@ -11,3 +11,6 @@ node_modules/
 supabase/.temp/
 supabase/.branches/
 .claude/
+
+.vercel
+.env*

@@ -1,8 +1,10 @@
 // Vercel 서버리스 함수: 기존 server.py 의 /api/* 를 그대로 받아 Supabase(tr_api)로 넘김
 // 게임 화면(public/game.js)은 수정 없이 같은 주소를 호출함
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+// 값 앞뒤의 BOM/공백/줄바꿈은 제거 (Windows에서 붙여넣으면 섞여 들어올 수 있음)
+const clean = (v) => (v || '').replace(/^[﻿\s]+|[﻿\s]+$/g, '');
+const SUPABASE_URL = clean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL).replace(/\/+$/, '');
+const SUPABASE_KEY = clean(process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
 const GET_ACTIONS = new Set(['state', 'leaderboard']);
 const POST_ACTIONS = new Set(['join', 'leave', 'update', 'start', 'finish', 'reset', 'settings']);
