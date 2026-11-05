@@ -1,45 +1,71 @@
-* { box-sizing: border-box; }
+@charset "utf-8";
+/*****************************************************
+ * TURBO RACER 공통 스타일시트
+ * 작성: 2006.11  디자인팀
+ * 수정: 2007.04  IE6 깨짐 수정 (김과장)
+ *       2008.02  아이폰 대응?? -> 일단 보류
+ *       2009.09  색 바꿈 (대표님 지시)
+ * ※ 순서 바꾸지 마세요!! IE에서 깨짐
+ *****************************************************/
+
+/* ===== reset ===== */
+* { -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
-body {
+html { _height: 100%; }  /* IE6 */
+BODY {
   font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  background: #1d2160; /* 그라데이션 안되는 브라우저용 */
   background: radial-gradient(circle at 30% 20%, #2b3a8c, #120f2e 70%);
-  color: #fff; -webkit-user-select: none; user-select: none; touch-action: none;
+  color: #FFFFFF; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: none;
 }
-button { font: inherit; cursor: pointer; }
-.screen { display: none; position: fixed; inset: 0; }
-.screen.active { display: flex; align-items: center; justify-content: center; padding: 16px; }
-#game.active { padding: 0; }
+button { font: inherit; cursor: pointer; cursor: hand; }
+
+/* ===== 화면 ===== */
+.screen { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
+.screen.active { display: -webkit-box; display: -ms-flexbox; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; padding: 16px; }
+#game.active { padding: 0px !important; }
 
 .panel {
   width: 100%; max-width: 420px; max-height: 100%; overflow: auto;
   background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.18);
-  border-radius: 22px; padding: 26px 22px; text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,.4); backdrop-filter: blur(6px);
+  -webkit-border-radius: 22px; -moz-border-radius: 22px; border-radius: 22px; padding: 26px 22px; text-align: center;
+  -webkit-box-shadow: 0 20px 60px rgba(0,0,0,.4); -moz-box-shadow: 0 20px 60px rgba(0,0,0,.4); box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  *zoom: 1; /* IE7 hasLayout */
 }
 .panel.wide { max-width: 760px; }
 #lobby .panel { max-width: 500px; }
 .logo { font-size: 44px; margin: 0; letter-spacing: 2px; font-style: italic; color: #ffd23d;
   text-shadow: 3px 3px 0 #ff4d4d, 6px 6px 0 rgba(0,0,0,.3); }
 .logo span { color: #fff; margin-left: 6px; }
+/* .logo { color: red; font-family: 굴림; }  예전 로고 */
 h2 { margin: 0 0 6px; font-size: 28px; }
 h3 { margin: 14px 0 6px; font-size: 16px; color: #ffd23d; }
-.sub { opacity: .8; margin: 6px 0 18px; font-size: 14px; }
-.hint { opacity: .6; font-size: 13px; }
+.sub { opacity: .8; filter: alpha(opacity=80); margin: 6px 0 18px; font-size: 14px; }
+.hint { opacity: .6; filter: alpha(opacity=60); font-size: 13px; }
 label, .label { display: block; text-align: left; font-size: 14px; opacity: .9; margin: 10px 0 6px; }
-input { width: 100%; margin-top: 6px; padding: 12px 14px; font-size: 18px; border-radius: 12px;
+input { width: 100%; margin-top: 6px; padding: 12px 14px; font-size: 18px; -webkit-border-radius: 12px; border-radius: 12px;
   border: 2px solid rgba(255,255,255,.3); background: rgba(0,0,0,.3); color: #fff; outline: none; }
 input:focus { border-color: #ffd23d; }
+
+/* 색 고르기 */
 .colors { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 16px; }
-.colors button { width: 38px; height: 38px; border-radius: 50%; border: 3px solid transparent; }
-.colors button.sel { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 12px #fff8; }
-.big { width: 100%; padding: 14px; font-size: 20px; font-weight: bold; border: 0; border-radius: 14px;
+.colors button { width: 38px; height: 38px; -webkit-border-radius: 50%; border-radius: 50%; border: 3px solid transparent; }
+.colors button.sel { border-color: #fff; -webkit-transform: scale(1.15); -ms-transform: scale(1.15); transform: scale(1.15); box-shadow: 0 0 12px #fff8; }
+
+/* 버튼 */
+.big { width: 100%; padding: 14px; font-size: 20px; font-weight: bold; border: 0; -webkit-border-radius: 14px; border-radius: 14px;
+  background: #ffb92b;
+  background: -webkit-linear-gradient(#ffd23d, #ff9f1a);
   background: linear-gradient(#ffd23d, #ff9f1a); color: #3a1d00; box-shadow: 0 5px 0 #b86400; margin-top: 10px; }
-.big:active { transform: translateY(3px); box-shadow: 0 2px 0 #b86400; }
+.big:active { -webkit-transform: translateY(3px); transform: translateY(3px); box-shadow: 0 2px 0 #b86400; }
 .big:disabled { opacity: .5; }
 .link { background: none; border: 0; color: #9fc2ff; margin-top: 14px; font-size: 15px; }
 .row { display: flex; justify-content: space-between; }
 .err { color: #ff8080; min-height: 1em; font-size: 14px; }
+.err { _height: 1em; } /* IE6 min-height 안됨 */
 
+/* 참가자 목록 */
 .plist { list-style: none; padding: 0; margin: 0 0 8px; text-align: left; }
 .plist li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 6px 0;
   background: rgba(0,0,0,.25); border-radius: 12px; font-size: 17px; }
@@ -63,20 +89,23 @@ input:focus { border-color: #ffd23d; }
 #touch button.nitro { background: rgba(61,139,255,.55); font-size: 30px; align-self: flex-end; }
 .plist .me { margin-left: 6px; font-size: 12px; background: #ffd23d; color: #3a1d00; padding: 2px 8px; border-radius: 10px; }
 
-#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-#hud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; }
+/* ===== 게임화면 ===== */
+#cv { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; display: block; }
+/* HUD - 2008.05 이후 안씀 (지우면 안됨? 확인필요) */
+#hud { position: absolute; top: 10px; left: 50%; -webkit-transform: translateX(-50%); transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; }
 .hud-box { background: rgba(0,0,0,.55); border-radius: 12px; padding: 6px 12px; text-align: center; min-width: 64px; }
 .hud-box small { display: block; font-size: 11px; opacity: .7; }
 .hud-box b { font-size: 20px; }
 #hudPos { color: #ffd23d; }
 #liveRank { position: absolute; top: 10px; left: 10px; margin: 0; padding: 8px 10px 8px 30px;
   background: rgba(0,0,0,.45); border-radius: 12px; font-size: 14px; pointer-events: none; max-width: 40vw; }
-#liveRank li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#liveRank li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -o-text-overflow: ellipsis; }
 #liveRank li.me { color: #ffd23d; font-weight: bold; }
 #center { position: absolute; top: 38%; left: 0; right: 0; text-align: center; font-size: 90px; font-weight: 900;
   font-style: italic; color: #fff; text-shadow: 4px 4px 0 #ff4d4d, 0 0 30px #000; pointer-events: none; }
 #center small { display: block; font-size: 24px; font-style: normal; text-shadow: 2px 2px 0 #000; }
 
+/* 터치 버튼 (휴대폰) */
 #touch { display: none; position: absolute; bottom: 16px; left: 16px; right: 16px; justify-content: space-between; pointer-events: none; }
 body.touch #touch { display: flex; }
 #touch > div { display: flex; gap: 12px; pointer-events: auto; }
@@ -87,22 +116,25 @@ body.touch #touch { display: flex; }
 #touch button.brake { background: rgba(255,77,77,.45); }
 #touch button.on { background: rgba(255,255,255,.55); }
 
+/* ===== 결과 ===== */
 .podium { display: flex; align-items: flex-end; justify-content: center; gap: 10px; margin: 20px 0 14px; min-height: 190px; }
 .pod { width: 120px; text-align: center; }
 .pod .name { font-weight: bold; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pod .car { width: 50px; height: 28px; margin: 0 auto 6px; border-radius: 8px; border: 3px solid #0004; }
 .pod .block { border-radius: 10px 10px 0 0; font-size: 34px; font-weight: 900; padding-top: 8px; color: #3a1d00; }
-.pod.p1 .block { height: 110px; background: linear-gradient(#ffe680, #e6b800); }
-.pod.p2 .block { height: 80px; background: linear-gradient(#f0f0f0, #a9b1bd); }
-.pod.p3 .block { height: 60px; background: linear-gradient(#ffc28a, #c26d2c); }
+.pod.p1 .block { height: 110px; background: #f3cf40; background: linear-gradient(#ffe680, #e6b800); }
+.pod.p2 .block { height: 80px; background: #cdd2d9; background: linear-gradient(#f0f0f0, #a9b1bd); }
+.pod.p3 .block { height: 60px; background: #e0975b; background: linear-gradient(#ffc28a, #c26d2c); }
 .pod .t { font-size: 13px; opacity: .85; }
 
 .tbl { width: 100%; border-collapse: collapse; font-size: 15px; }
 .tbl th { font-size: 12px; opacity: .7; padding: 6px; }
 .tbl td { padding: 7px 6px; border-top: 1px solid rgba(255,255,255,.12); }
-.tbl .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.tbl .sw { display: inline-block; *display: inline; *zoom: 1; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } #center { font-size: 64px; } .hud-box b { font-size: 16px; } .hud-box { min-width: 50px; padding: 4px 8px; } #hud { top: auto; bottom: 120px; } }
 
-.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+/* ===== 팝업 ===== */
+.modal { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,.6); align-items: center; justify-content: center; padding: 16px; z-index: 10; }
 .modal.active { display: flex; }
+/* .modal { z-index: 9999 !important; }   이거 넣으면 버튼 안눌림 2007.04 */

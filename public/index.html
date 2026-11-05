@@ -1,106 +1,119 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>터보 레이서</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
+<!DOCTYPE HTML>
+<!--
+  TURBO RACER  메인페이지
+  최종수정 : 2009.06.11
+  담당자   : 박대리 (내선 2041)  -> 퇴사함. 김과장한테 물어보세요
+-->
+<HTML LANG="ko">
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META HTTP-EQUIV="X-UA-Compatible" CONTENT="IE=EmulateIE7">
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Expires" CONTENT="-1">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<TITLE>터보 레이서</TITLE>
+<LINK REL="stylesheet" TYPE="text/css" HREF="style.css">
+<!--[if lt IE 7]>
+<SCRIPT TYPE="text/javascript">alert('IE6 이하는 지원하지 않습니다. 업그레이드 해주세요.');</SCRIPT>
+<![endif]-->
+</HEAD>
+<BODY>
 
-<!-- 참가 화면 -->
-<section id="join" class="screen active">
-  <div class="panel">
-    <h1 class="logo">TURBO<span>RACER</span></h1>
-    <p class="sub">혼자서도, 한 PC에서 여럿이도, 와이파이로 여럿이도!</p>
-    <label>닉네임
-      <input id="nameInput" maxlength="12" placeholder="닉네임 입력" autocomplete="off">
-    </label>
-    <div class="label">자동차 색</div>
-    <div id="colorPick" class="colors"></div>
-    <button id="joinBtn" class="big">참가하기</button>
-    <p id="joinErr" class="err"></p>
-    <button class="link" data-show-board>🏆 명예의 전당</button>
-  </div>
-</section>
+<!-- ========================= 참가 화면 ========================= -->
+<DIV ID="join" CLASS="screen active">
+  <DIV CLASS="panel">
+    <H1 CLASS="logo">TURBO<SPAN>RACER</SPAN></H1>
+    <P CLASS="sub">혼자서도, 한 PC에서 여럿이도, 와이파이로 여럿이도!</P>
+    <LABEL>닉네임
+      <INPUT TYPE="text" ID="nameInput" MAXLENGTH="12" placeholder="닉네임 입력" AUTOCOMPLETE="off">
+    </LABEL>
+    <DIV CLASS="label">자동차 색</DIV>
+    <DIV ID="colorPick" CLASS="colors"></DIV>
+    <BUTTON ID="joinBtn" CLASS="big">참가하기</BUTTON>
+    <P ID="joinErr" CLASS="err"></P>
+    <BUTTON CLASS="link" data-show-board>🏆 명예의 전당</BUTTON>
+    <!-- <A HREF="javascript:void(0)" onclick="showBoard()">랭킹보기</A> -->
+  </DIV>
+</DIV>
 
-<!-- 로비 -->
-<section id="lobby" class="screen">
-  <div class="panel">
-    <h2>대기실</h2>
-    <p class="sub"><span id="lobbyCount">0</span>명 참가 · 최대 8명 · <span id="lobbyLaps">3</span>바퀴</p>
-    <ul id="lobbyList" class="plist"></ul>
-    <div class="addrow">
-      <button id="addLocalBtn" class="small">➕ 같은 PC 친구</button>
-      <button id="addBotBtn" class="small">🤖 컴퓨터 추가</button>
-    </div>
-    <div id="addLocalForm" class="addform">
-      <input id="localName" maxlength="12" placeholder="같이 할 사람 닉네임" autocomplete="off">
-      <button id="localOk" class="small">추가</button>
-    </div>
-    <div class="opts">
-      <div class="opt"><span>난이도</span><div class="seg" id="optDiff">
-        <button data-v="easy">쉬움</button><button data-v="normal">보통</button><button data-v="hard">어려움</button></div></div>
-      <div class="opt"><span>바퀴 수</span><div class="seg" id="optLaps">
-        <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
-      <div class="opt"><span>카메라</span><div class="seg" id="optCam">
-        <button data-v="rotate">차 따라 회전</button><button data-v="fixed">위에서 고정</button></div></div>
-      <div class="opt"><span>자동 가속</span><div class="seg" id="optAuto">
-        <button data-v="on">켜기</button><button data-v="off">끄기</button></div></div>
-      <p class="opthint">난이도·바퀴 수는 모두에게 적용 · 카메라·자동 가속은 이 기기만<br>
-        ⚡ 부스터: <b>Space</b> (화면 분할 땐 Shift / Enter / U / 숫자0) · 길 위의 <b>?</b> 상자를 먹으면 부스터 +1</p>
-    </div>
-    <button id="startBtn" class="big">🏁 레이스 시작!</button>
-    <p class="hint" id="lobbyHint">혼자: 방향키/WASD · 한 PC 여럿이: 키보드를 나눠 써요(화면 분할) · 휴대폰: 화면 버튼</p>
-    <div class="row">
-      <button class="link" data-show-board>🏆 명예의 전당</button>
-      <button id="leaveBtn" class="link">나가기</button>
-    </div>
-  </div>
-</section>
+<!-- ========================= 로비 ========================= -->
+<DIV ID="lobby" CLASS="screen">
+  <DIV CLASS="panel">
+    <H2>대기실</H2>
+    <P CLASS="sub"><SPAN ID="lobbyCount">0</SPAN>명 참가 &middot; 최대 8명 &middot; <SPAN ID="lobbyLaps">3</SPAN>바퀴</P>
+    <UL ID="lobbyList" CLASS="plist"></UL>
+    <DIV CLASS="addrow">
+      <BUTTON ID="addLocalBtn" CLASS="small">➕ 같은 PC 친구</BUTTON>
+      <BUTTON ID="addBotBtn" CLASS="small">🤖 컴퓨터 추가</BUTTON>
+    </DIV>
+    <DIV ID="addLocalForm" CLASS="addform">
+      <INPUT TYPE="text" ID="localName" MAXLENGTH="12" placeholder="같이 할 사람 닉네임" AUTOCOMPLETE="off">
+      <BUTTON ID="localOk" CLASS="small">추가</BUTTON>
+    </DIV>
+    <DIV CLASS="opts">
+      <DIV CLASS="opt"><SPAN>난이도</SPAN><DIV CLASS="seg" ID="optDiff">
+        <BUTTON data-v="easy">쉬움</BUTTON><BUTTON data-v="normal">보통</BUTTON><BUTTON data-v="hard">어려움</BUTTON></DIV></DIV>
+      <DIV CLASS="opt"><SPAN>바퀴 수</SPAN><DIV CLASS="seg" ID="optLaps">
+        <BUTTON data-v="1">1</BUTTON><BUTTON data-v="2">2</BUTTON><BUTTON data-v="3">3</BUTTON><BUTTON data-v="5">5</BUTTON></DIV></DIV>
+      <DIV CLASS="opt"><SPAN>카메라</SPAN><DIV CLASS="seg" ID="optCam">
+        <BUTTON data-v="rotate">차 따라 회전</BUTTON><BUTTON data-v="fixed">위에서 고정</BUTTON></DIV></DIV>
+      <DIV CLASS="opt"><SPAN>자동 가속</SPAN><DIV CLASS="seg" ID="optAuto">
+        <BUTTON data-v="on">켜기</BUTTON><BUTTON data-v="off">끄기</BUTTON></DIV></DIV>
+      <P CLASS="opthint">난이도&middot;바퀴 수는 모두에게 적용 &middot; 카메라&middot;자동 가속은 이 기기만<BR>
+        ⚡ 부스터: <B>Space</B> (화면 분할 땐 Shift / Enter / U / 숫자0) &middot; 길 위의 <B>?</B> 상자를 먹으면 부스터 +1</P>
+    </DIV>
+    <BUTTON ID="startBtn" CLASS="big">🏁 레이스 시작!</BUTTON>
+    <P CLASS="hint" ID="lobbyHint">혼자: 방향키/WASD &middot; 한 PC 여럿이: 키보드를 나눠 써요(화면 분할) &middot; 휴대폰: 화면 버튼</P>
+    <DIV CLASS="row">
+      <BUTTON CLASS="link" data-show-board>🏆 명예의 전당</BUTTON>
+      <BUTTON ID="leaveBtn" CLASS="link">나가기</BUTTON>
+    </DIV>
+  </DIV>
+</DIV>
 
-<!-- 게임 -->
-<section id="game" class="screen">
-  <canvas id="cv"></canvas>
-  <ol id="liveRank"></ol>
-  <div id="center"></div>
-  <div id="touch">
-    <div class="tleft">
-      <button data-k="left">◀</button><button data-k="right">▶</button>
-    </div>
-    <div class="tright">
-      <button data-k="nitro" class="nitro">⚡</button><button data-k="down" class="brake">브레이크</button><button data-k="up" class="gas">가속</button>
-    </div>
-  </div>
-</section>
+<!-- ========================= 게임 ========================= -->
+<DIV ID="game" CLASS="screen">
+  <CANVAS ID="cv"></CANVAS>
+  <OL ID="liveRank"></OL>
+  <DIV ID="center"></DIV>
+  <!-- <DIV ID="hud"></DIV>  2008.05 HUD 삭제 -->
+  <DIV ID="touch">
+    <DIV CLASS="tleft">
+      <BUTTON data-k="left">◀</BUTTON><BUTTON data-k="right">▶</BUTTON>
+    </DIV>
+    <DIV CLASS="tright">
+      <BUTTON data-k="nitro" CLASS="nitro">⚡</BUTTON><BUTTON data-k="down" CLASS="brake">브레이크</BUTTON><BUTTON data-k="up" CLASS="gas">가속</BUTTON>
+    </DIV>
+  </DIV>
+</DIV>
 
-<!-- 결과 -->
-<section id="results" class="screen">
-  <div class="panel wide">
-    <h2>레이스 결과</h2>
-    <div id="podium" class="podium"></div>
-    <table class="tbl"><thead><tr><th>등수</th><th>이름</th><th>기록</th></tr></thead>
-      <tbody id="resultRows"></tbody></table>
-    <button id="againBtn" class="big">다시 하기</button>
-    <button class="link" data-show-board>🏆 명예의 전당</button>
-  </div>
-</section>
+<!-- ========================= 결과 ========================= -->
+<DIV ID="results" CLASS="screen">
+  <DIV CLASS="panel wide">
+    <H2>레이스 결과</H2>
+    <DIV ID="podium" CLASS="podium"></DIV>
+    <TABLE CLASS="tbl" CELLPADDING="0" CELLSPACING="0" BORDER="0"><THEAD><TR><TH>등수</TH><TH>이름</TH><TH>기록</TH></TR></THEAD>
+      <TBODY ID="resultRows"></TBODY></TABLE>
+    <BUTTON ID="againBtn" CLASS="big">다시 하기</BUTTON>
+    <BUTTON CLASS="link" data-show-board>🏆 명예의 전당</BUTTON>
+  </DIV>
+</DIV>
 
-<!-- 명예의 전당 -->
-<div id="board" class="modal">
-  <div class="panel wide">
-    <h2>🏆 명예의 전당</h2>
-    <p class="sub" id="boardTotal"></p>
-    <div class="cols">
-      <div><h3>최고 기록 TOP 10</h3>
-        <table class="tbl"><thead><tr><th>#</th><th>이름</th><th>기록</th></tr></thead><tbody id="bestRows"></tbody></table></div>
-      <div><h3>메달 순위</h3>
-        <table class="tbl"><thead><tr><th>이름</th><th>🥇</th><th>🥈</th><th>🥉</th><th>판</th></tr></thead><tbody id="winRows"></tbody></table></div>
-    </div>
-    <button id="boardClose" class="big">닫기</button>
-  </div>
-</div>
+<!-- ========================= 명예의 전당 (팝업) ========================= -->
+<DIV ID="board" CLASS="modal">
+  <DIV CLASS="panel wide">
+    <H2>🏆 명예의 전당</H2>
+    <P CLASS="sub" ID="boardTotal"></P>
+    <DIV CLASS="cols">
+      <DIV><H3>최고 기록 TOP 10</H3>
+        <TABLE CLASS="tbl" CELLPADDING="0" CELLSPACING="0" BORDER="0"><THEAD><TR><TH>#</TH><TH>이름</TH><TH>기록</TH></TR></THEAD><TBODY ID="bestRows"></TBODY></TABLE></DIV>
+      <DIV><H3>메달 순위</H3>
+        <TABLE CLASS="tbl" CELLPADDING="0" CELLSPACING="0" BORDER="0"><THEAD><TR><TH>이름</TH><TH>🥇</TH><TH>🥈</TH><TH>🥉</TH><TH>판</TH></TR></THEAD><TBODY ID="winRows"></TBODY></TABLE></DIV>
+    </DIV>
+    <BUTTON ID="boardClose" CLASS="big">닫기</BUTTON>
+  </DIV>
+</DIV>
 
-<script src="game.js"></script>
-</body>
-</html>
+<SCRIPT TYPE="text/javascript" LANGUAGE="javascript" SRC="game.js"></SCRIPT>
+</BODY>
+</HTML>
