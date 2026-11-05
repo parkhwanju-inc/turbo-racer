@@ -1,0 +1,6 @@
+*.db
+*.py
+*.bat
+supabase
+.env*
+.claude

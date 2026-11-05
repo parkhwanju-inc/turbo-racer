@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>터보 레이서</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 참가 화면 -->
+<section id="join" class="screen active">
+  <div class="panel">
+    <h1 class="logo">TURBO<span>RACER</span></h1>
+    <p class="sub">혼자서도, 한 PC에서 여럿이도, 와이파이로 여럿이도!</p>
+    <label>닉네임
+      <input id="nameInput" maxlength="12" placeholder="닉네임 입력" autocomplete="off">
+    </label>
+    <div class="label">자동차 색</div>
+    <div id="colorPick" class="colors"></div>
+    <button id="joinBtn" class="big">참가하기</button>
+    <p id="joinErr" class="err"></p>
+    <button class="link" data-show-board>🏆 명예의 전당</button>
+  </div>
+</section>
+
+<!-- 로비 -->
+<section id="lobby" class="screen">
+  <div class="panel">
+    <h2>대기실</h2>
+    <p class="sub"><span id="lobbyCount">0</span>명 참가 · 최대 8명 · <span id="lobbyLaps">3</span>바퀴</p>
+    <ul id="lobbyList" class="plist"></ul>
+    <div class="addrow">
+      <button id="addLocalBtn" class="small">➕ 같은 PC 친구</button>
+      <button id="addBotBtn" class="small">🤖 컴퓨터 추가</button>
+    </div>
+    <div id="addLocalForm" class="addform">
+      <input id="localName" maxlength="12" placeholder="같이 할 사람 닉네임" autocomplete="off">
+      <button id="localOk" class="small">추가</button>
+    </div>
+    <div class="opts">
+      <div class="opt"><span>난이도</span><div class="seg" id="optDiff">
+        <button data-v="easy">쉬움</button><button data-v="normal">보통</button><button data-v="hard">어려움</button></div></div>
+      <div class="opt"><span>바퀴 수</span><div class="seg" id="optLaps">
+        <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
+      <div class="opt"><span>카메라</span><div class="seg" id="optCam">
+        <button data-v="rotate">차 따라 회전</button><button data-v="fixed">위에서 고정</button></div></div>
+      <div class="opt"><span>자동 가속</span><div class="seg" id="optAuto">
+        <button data-v="on">켜기</button><button data-v="off">끄기</button></div></div>
+      <p class="opthint">난이도·바퀴 수는 모두에게 적용 · 카메라·자동 가속은 이 기기만<br>
+        ⚡ 부스터: <b>Space</b> (화면 분할 땐 Shift / Enter / U / 숫자0) · 길 위의 <b>?</b> 상자를 먹으면 부스터 +1</p>
+    </div>
+    <button id="startBtn" class="big">🏁 레이스 시작!</button>
+    <p class="hint" id="lobbyHint">혼자: 방향키/WASD · 한 PC 여럿이: 키보드를 나눠 써요(화면 분할) · 휴대폰: 화면 버튼</p>
+    <div class="row">
+      <button class="link" data-show-board>🏆 명예의 전당</button>
+      <button id="leaveBtn" class="link">나가기</button>
+    </div>
+  </div>
+</section>
+
+<!-- 게임 -->
+<section id="game" class="screen">
+  <canvas id="cv"></canvas>
+  <ol id="liveRank"></ol>
+  <div id="center"></div>
+  <div id="touch">
+    <div class="tleft">
+      <button data-k="left">◀</button><button data-k="right">▶</button>
+    </div>
+    <div class="tright">
+      <button data-k="nitro" class="nitro">⚡</button><button data-k="down" class="brake">브레이크</button><button data-k="up" class="gas">가속</button>
+    </div>
+  </div>
+</section>
+
+<!-- 결과 -->
+<section id="results" class="screen">
+  <div class="panel wide">
+    <h2>레이스 결과</h2>
+    <div id="podium" class="podium"></div>
+    <table class="tbl"><thead><tr><th>등수</th><th>이름</th><th>기록</th></tr></thead>
+      <tbody id="resultRows"></tbody></table>
+    <button id="againBtn" class="big">다시 하기</button>
+    <button class="link" data-show-board>🏆 명예의 전당</button>
+  </div>
+</section>
+
+<!-- 명예의 전당 -->
+<div id="board" class="modal">
+  <div class="panel wide">
+    <h2>🏆 명예의 전당</h2>
+    <p class="sub" id="boardTotal"></p>
+    <div class="cols">
+      <div><h3>최고 기록 TOP 10</h3>
+        <table class="tbl"><thead><tr><th>#</th><th>이름</th><th>기록</th></tr></thead><tbody id="bestRows"></tbody></table></div>
+      <div><h3>메달 순위</h3>
+        <table class="tbl"><thead><tr><th>이름</th><th>🥇</th><th>🥈</th><th>🥉</th><th>판</th></tr></thead><tbody id="winRows"></tbody></table></div>
+    </div>
+    <button id="boardClose" class="big">닫기</button>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>

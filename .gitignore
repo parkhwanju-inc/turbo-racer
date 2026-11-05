@@ -1,0 +1,13 @@
+# 비밀값
+.env
+.env.*
+!.env.example
+
+# 로컬 실행용 SQLite (배포판은 Supabase 사용)
+*.db
+
+node_modules/
+.vercel/
+supabase/.temp/
+supabase/.branches/
+.claude/
