@@ -352,7 +352,9 @@ module.exports = async (req, res) => {
   if (req.method === "DELETE") return res.status(405).end(); // 세션이 없으니 끝낼 것도 없음
   if (req.method !== "POST") return res.status(405).end();
 
-  let body = req.body;
+  let body;
+  // Vercel 은 Content-Type 이 JSON 인데 본문이 깨져 있으면 req.body 를 읽는 순간 예외를 던진다
+  try { body = req.body; } catch (e) { return res.status(400).json(rpcError(null, -32700, "Parse error")); }
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (e) { return res.status(400).json(rpcError(null, -32700, "Parse error")); }
   }
