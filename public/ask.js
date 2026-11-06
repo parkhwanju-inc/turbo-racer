@@ -35,7 +35,10 @@
 
   function bubble(role, text, extra) {
     const b = el("div", { className: "ask-msg " + role });
-    b.textContent = text; // 답은 항상 글자로만 넣는다 (HTML 해석 안 함)
+    // 답은 항상 글자로만 넣는다 (HTML 해석 안 함). 모델이 그래도 쓴 마크다운 강조·제목 기호는 걷어냄
+    b.textContent = role.startsWith("bot")
+      ? text.replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/^#{1,6}\s+/gm, "")
+      : text;
     if (extra) b.append(el("small", { textContent: extra }));
     log.append(b);
     log.scrollTop = log.scrollHeight;
