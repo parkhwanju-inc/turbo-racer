@@ -112,3 +112,29 @@ body.touch #touch { display: flex; }
 
 .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); align-items: center; justify-content: center; padding: 16px; z-index: 10; }
 .modal.active { display: flex; }
+
+/* ---------------------------------------------------------------- AI 도우미 (ask.js) */
+body.has-ask .screen.active:not(#game) { padding-bottom: 76px; }
+#ask { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(560px, calc(100% - 24px));
+  z-index: 20; display: flex; flex-direction: column; gap: 8px; }
+#ask[hidden] { display: none; }
+.ask-bar { display: flex; gap: 8px; background: rgba(18,15,46,.92); border: 2px solid rgba(255,255,255,.22);
+  border-radius: 16px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.ask-input { margin: 0; flex: 1; font-size: 15px; padding: 10px 12px; border-radius: 11px; user-select: text; -webkit-user-select: text; }
+.ask-send { flex: 0 0 auto; border: 0; border-radius: 11px; padding: 0 16px; font-weight: bold;
+  background: linear-gradient(#ffd23d, #ff9f1a); color: #3a1d00; }
+.ask-send:disabled { opacity: .5; }
+.ask-panel { background: rgba(18,15,46,.96); border: 2px solid rgba(255,255,255,.18); border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); display: flex; flex-direction: column; max-height: min(52vh, 440px); }
+.ask-panel[hidden] { display: none; }
+.ask-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.ask-head b { margin-right: auto; }
+.ask-mcp, .ask-close { background: none; border: 0; color: #9fc2ff; font-size: 13px; padding: 4px 6px; }
+.ask-close { color: #fff; font-size: 16px; opacity: .7; }
+.ask-log { overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; user-select: text; -webkit-user-select: text; }
+.ask-msg { max-width: 88%; padding: 8px 12px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.ask-msg.me { align-self: flex-end; background: #ffd23d; color: #3a1d00; border-bottom-right-radius: 4px; }
+.ask-msg.bot { align-self: flex-start; background: rgba(255,255,255,.1); border-bottom-left-radius: 4px; }
+.ask-msg.wait { opacity: .7; font-style: italic; }
+.ask-msg.err { color: #ff9b9b; }
+.ask-msg small { display: block; margin-top: 4px; font-size: 11px; opacity: .6; }

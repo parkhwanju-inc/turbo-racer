@@ -11,6 +11,8 @@
 | `public/` | 게임 화면 (HTML/CSS/JS) — Vercel이 정적 파일로 제공 |
 | `api/[action].js` | Vercel 서버리스 함수. `/api/join`, `/api/update` 등을 Supabase `tr_api` 함수로 전달 |
 | `api/mcp.js` | 원격 MCP 서버 (`/api/mcp`). AI 가 방 상태·기록을 보고, 운영자는 방 관리·기록 정리 |
+| `api/ask.js`, `public/ask.js` | 화면 아래 AI 도우미 입력창. OpenRouter 모델이 MCP 와 같은 공개 조회 도구로 실제 데이터를 보고 답함 |
+| `lib/turbo-tools.js` | MCP 와 AI 도우미가 같이 쓰는 도구 정의·Supabase 호출 |
 | `supabase/migrations/` | 방 상태·레이스 기록 테이블과 게임 로직(`tr_api`), 운영 함수(`tr_admin`) |
 | `server.py`, `start.bat` | 같은 와이파이에서 로컬로 돌릴 때 쓰는 서버 (SQLite, Supabase 불필요, MCP 없음) |
 
@@ -39,6 +41,14 @@ claude mcp add --transport http turbo-racer-admin https://turbo-racer-gules.verc
 - claude.ai / Claude 데스크톱: 설정 → 커넥터 → 사용자 지정 커넥터 추가 → 위 주소. 이 화면은 헤더를 넣을 수 없어서 운영자로 쓰려면 주소 끝에 `?key=<MCP_ADMIN_KEY>` 를 붙입니다. 주소에 넣은 키는 접속 기록에 남을 수 있으니 본인만 쓰고, 새어 나갔다 싶으면 키를 바꾸세요.
 - AI 는 플레이어로 참가할 수 없습니다. 게임은 브라우저가 차를 직접 운전하면서 위치를 계속 보내야 해서(10초 끊기면 퇴장), 방 관리는 운영자 입장에서만 합니다.
 - 운영자 키 바꾸기: `vercel env rm MCP_ADMIN_KEY production` → `vercel env add MCP_ADMIN_KEY production` → `vercel deploy --prod`.
+
+## AI 도우미 (화면 아래 입력창)
+
+참가·대기실·결과 화면 아래 입력창에 질문하면 `/api/ask` 가 OpenRouter 모델로 답합니다. "지금 방 어때?", "3바퀴 1등 누구야?", "○○ 전적 알려줘" 같은 질문은 MCP 의 공개 조회 도구를 직접 실행해서 실제 데이터로 답합니다(운영자 도구는 절대 안 씀). 레이스 화면에서는 숨겨집니다.
+
+- Vercel 환경변수: `OPENROUTER_API_KEY`(필수), `OPENROUTER_MODEL`(선택, 기본 `anthropic/claude-haiku-5.5`)
+- 남용 방지: 질문 800자, 대화 기록 10개, IP 당 1분 8회(함수 인스턴스별), 답 최대 700토큰, 도구 호출 4회. 누구나 쓸 수 있는 공개 입력창이라 **OpenRouter 키에 사용 한도(credit limit)를 꼭 걸어 두세요.**
+- 키 바꾸기: `vercel env add OPENROUTER_API_KEY production --force` → `vercel deploy --prod`
 
 ## 배포
 
