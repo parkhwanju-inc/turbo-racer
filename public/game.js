@@ -188,7 +188,7 @@ async function api(path, body) {
       offset = data.now - (t0 + t1) / 2000;
     }
   }
-  if (!res.ok) throw new Error(data.error || "오류");
+  if (!res.ok) throw Object.assign(new Error(data.error || "오류"), { status: res.status });
   return data;
 }
 
@@ -617,10 +617,23 @@ function physics(l, inp, dt) {
   // 완주 → 서버가 등수 결정
   if (!car.finished && car.dist >= S.laps * N) {
     car.finished = true;
-    api("/api/finish", { id: l.id, lap: S.laps, progress: car.dist / N })
-      .then((s) => { const me = s.players.find((p) => p.id === l.id); if (me) car.rank = me.rank; onState(s); })
-      .catch((e) => { car.err = e.message; });
+    sendFinish(l, car, { id: l.id, lap: S.laps, progress: car.dist / N });
   }
+}
+
+// 완주 전송. 네트워크 오류·타임아웃·5xx 면 될 때까지 다시 보낸다 (#5).
+// 서버는 이미 등수가 있으면 200 을 주므로 여러 번 보내도 안전. 4xx(거절)는 다시 보내지 않음.
+function sendFinish(l, car, body, tries = 0) {
+  api("/api/finish", body)
+    .then((s) => { car.err = null; const me = s.players.find((p) => p.id === l.id); if (me) car.rank = me.rank; onState(s); })
+    .catch((e) => {
+      const me = pinfo(l.id);
+      if (car.rank || me.rank) { car.err = null; car.rank = car.rank || me.rank; return; } // 그사이 폴링으로 등수를 받음
+      const rejected = e.status >= 400 && e.status < 500;
+      if (rejected || l.car !== car || !localOf(l.id) || !S || S.phase !== "racing") { car.err = e.message; return; }
+      car.err = "기록 전송 중… (연결을 다시 시도하고 있어요)";
+      setTimeout(() => sendFinish(l, car, body, tries + 1), Math.min(3000, 300 * 2 ** tries));
+    });
 }
 
 function updateRemotes(dt) {
