@@ -869,7 +869,9 @@ function drawAll() {
   } else {
     const size = n === 1 ? Math.min(170, W * 0.32) : Math.min(150, W * 0.22);
     const bh = size * (BOUNDS.y1 - BOUNDS.y0) / (BOUNDS.x1 - BOUNDS.x0);
-    if (n === 1) drawMap(W - size - 16, 16, size, bh);
+    // 터치(혼자)에선 HUD 가 화면 위쪽(12~58px)에 있으므로 그 아래에 그림 (순위표도 CSS 로 같이 내림)
+    const top = n === 1 && document.body.classList.contains("touch") ? 74 : 16;
+    if (n === 1) drawMap(W - size - 16, top, size, bh);
     else if (n === 2 && W >= H) drawMap(W / 2 - size / 2, 16, size, bh);
     else drawMap(W / 2 - size / 2, H / 2 - bh / 2, size, bh);
   }
