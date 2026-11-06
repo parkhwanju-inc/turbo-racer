@@ -148,6 +148,7 @@ let offset = 0, bestRtt = 1e9;
 let screen = "join";
 let remotes = {};
 let busy = false, lastPoll = 0;
+let netGen = 0; // 나가기 때마다 올림. 나가기 전에 보낸 폴링 응답을 구분하는 데 씀
 
 const serverNow = () => Date.now() / 1000 + offset;
 const humans = () => locals.filter((l) => !l.ai);
@@ -203,7 +204,9 @@ async function netTick() {
       id: l.id, x: +l.car.x.toFixed(1), y: +l.car.y.toFixed(1), a: +l.car.a.toFixed(3),
       v: +l.car.fwd.toFixed(1), progress: +(l.car.dist / N).toFixed(4), lap: l.car.lap,
     })) : [];
-    onState(await api("/api/update", { ids: locals.map((l) => l.id), cars }));
+    const gen = netGen;
+    const s = await api("/api/update", { ids: locals.map((l) => l.id), cars });
+    if (gen === netGen) onState(s); // 그사이 나갔으면 옛 응답은 버림 (#18)
   } catch (e) {
     console.warn(e);
   } finally {
@@ -381,11 +384,17 @@ $("addBotBtn").onclick = async () => {
 $("startBtn").onclick = async () => {
   try { onState(await api("/api/start", { id: humans()[0].id })); } catch (e) { alert(e.message); }
 };
-$("leaveBtn").onclick = async () => {
-  await Promise.all(locals.map((l) => api("/api/leave", { id: l.id }).catch(() => {})));
+$("leaveBtn").onclick = () => {
+  // 화면과 로컬 상태를 먼저 정리한다. leave 응답을 기다리는 동안 폴링 응답이 먼저 오면
+  // onState 가 "우리 플레이어가 사라졌다"고 보고 연결 끊김 오류를 띄우기 때문 (#18).
+  // join 화면에서는 netTick 이 멈추고 onState 도 화면을 바꾸지 않는다.
+  const leaving = locals;
+  netGen++;
   locals = [];
   saveLocals();
   show("join");
+  $("joinErr").textContent = "";
+  for (const l of leaving) api("/api/leave", { id: l.id }).catch(() => {});
 };
 
 // ---------------------------------------------------------------- 결과
