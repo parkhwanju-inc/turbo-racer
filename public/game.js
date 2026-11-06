@@ -141,6 +141,8 @@ const MAX_CHARGES = 3;
 
 // ---------------------------------------------------------------- 상태
 // locals: 이 브라우저가 맡은 플레이어들 {id, token, ai, skill, lane, car, cam, ...}
+// id -> 비밀 토큰. 로컬 목록에서 먼저 빠진 플레이어(나가기 버튼)도 leave 를 보낼 수 있게 따로 기억
+const tokenOf = {};
 let locals = loadLocals();
 let myColor = localStorage.getItem("tr_color") || COLORS[Math.floor(Math.random() * COLORS.length)];
 let S = null;
@@ -169,6 +171,7 @@ function saveLocals() {
   catch (e) { /* ignore */ }
 }
 function newLocal(o) {
+  if (o.token) tokenOf[o.id] = o.token;
   return { id: o.id, token: o.token, ai: !!o.ai, skill: 0.8 + Math.random() * 0.13, lane: (Math.random() - 0.5) * 70,
            car: null, cam: { x: 0, y: 0, z: 1 }, stuck: 0, rev: 0 };
 }
@@ -180,6 +183,7 @@ async function api(path, body) {
     // 이 브라우저가 맡은 플레이어들의 비밀 토큰 (서버가 쓰기 요청을 확인함)
     const tokens = {};
     for (const l of locals) if (l.token) tokens[l.id] = l.token;
+    if (typeof body.id === "string" && tokenOf[body.id]) tokens[body.id] = tokenOf[body.id];
     body = Object.assign({}, body, { tokens });
   }
   const res = await fetch(path, body === undefined ? {} : {
