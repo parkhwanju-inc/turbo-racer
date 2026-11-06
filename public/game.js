@@ -593,11 +593,26 @@ async function openBoard() {
 function startRace() {
   const D = diff();
   for (const l of locals) {
-    const g = gridPos(pinfo(l.id).slot || 0);
+    const p = pinfo(l.id);
+    const g = gridPos(p.slot || 0);
     l.car = { x: g.x, y: g.y, a: g.a, vx: 0, vy: 0, fwd: 0, idx: g.i, dist: -g.back, lap: 0, lat: 0,
               steer: 0, boost: 0, boostMax: 1, grass: false, finished: false, rank: null, err: null,
               charges: D.start, gauge: 0, nitroHeld: false, pops: [] };
-    l.cam = { x: g.x, y: g.y, z: 1, a: g.a };
+    // 레이스 도중 새로고침: 서버에 남은 내 위치·진행도로 이어서 달림 (완주했으면 완주 상태로)
+    if (serverNow() > S.start_at && p.progress > -1 && (p.x || p.y)) {
+      const c = l.car;
+      let dist = Math.round(p.progress * N);
+      const guess = ((dist % N) + N) % N;
+      const n = nearest(p.x, p.y, guess);
+      let d = n.i - guess;
+      if (d > N / 2) d -= N;
+      if (d < -N / 2) d += N;
+      dist += d;
+      Object.assign(c, { x: p.x, y: p.y, a: p.a, idx: n.i, lat: n.lat, dist,
+                         lap: Math.max(0, Math.floor(dist / N)), grass: Math.abs(n.lat) > ROAD });
+      if (p.rank) { c.finished = true; c.rank = p.rank; }
+    }
+    l.cam = { x: l.car.x, y: l.car.y, z: 1, a: l.car.a };
     l.stuck = 0; l.rev = 0;
     l.skill = D.ai[0] + Math.random() * (D.ai[1] - D.ai[0]);
   }
