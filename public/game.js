@@ -300,6 +300,7 @@ function show(name) {
   screen = name;
   document.querySelectorAll(".screen").forEach((e) => e.classList.toggle("active", e.id === name));
   if (name === "game") resize();
+  if (name === "lobby") $("lobbyErr").textContent = "";
 }
 
 function el(tag, props = {}, ...kids) {
@@ -431,10 +432,24 @@ function renderOptions() {
   mark("optAuto", opts.autoGas ? "on" : "off");
   $("lobbyLaps").textContent = st.laps;
 }
-async function setRoom(change) {
-  try { onState(await api("/api/settings", Object.assign({ id: humans()[0].id }, change))); }
-  catch (e) { alert(e.message); }
+// 시작/설정 요청은 한 번에 하나만 보내고, 오류는 alert 대신 대기실 안 문구로 보여 준다 (#20).
+// alert 은 페이지를 멈춰서 카운트다운을 놓치고, 오래 두면 리타이어된다.
+// 다른 사람이 먼저 시작해서 생긴 오류는 무시한다. 다음 폴링이 레이스 화면으로 데려간다.
+const RACE_STARTED_ERRORS = new Set(["이미 시작했어요", "대기실에서만 바꿀 수 있어요"]);
+let roomBusy = false;
+async function roomAction(path, extra) {
+  if (roomBusy || !humans().length) return;
+  roomBusy = true;
+  $("startBtn").disabled = true;
+  $("lobbyErr").textContent = "";
+  try { onState(await api(path, Object.assign({ id: humans()[0].id }, extra))); }
+  catch (e) { if (!RACE_STARTED_ERRORS.has(e.message)) $("lobbyErr").textContent = e.message; }
+  finally {
+    roomBusy = false;
+    $("startBtn").disabled = false;
+  }
 }
+const setRoom = (change) => roomAction("/api/settings", change);
 document.querySelectorAll("#optDiff button").forEach((b) => (b.onclick = () => setRoom({ difficulty: b.dataset.v })));
 document.querySelectorAll("#optLaps button").forEach((b) => (b.onclick = () => setRoom({ laps: +b.dataset.v })));
 document.querySelectorAll("#optCam button").forEach((b) => (b.onclick = () => { opts.rotate = b.dataset.v === "rotate"; saveOpts(); renderOptions(); }));
@@ -466,9 +481,7 @@ $("addBotBtn").onclick = async () => {
   try { await addLocal({ name: "컴퓨터" + k, ai: true }); } catch (e) { alert(e.message); }
 };
 
-$("startBtn").onclick = async () => {
-  try { onState(await api("/api/start", { id: humans()[0].id })); } catch (e) { alert(e.message); }
-};
+$("startBtn").onclick = () => roomAction("/api/start", {});
 $("leaveBtn").onclick = () => {
   // 화면과 로컬 상태를 먼저 정리한다. leave 응답을 기다리는 동안 폴링 응답이 먼저 오면
   // onState 가 "우리 플레이어가 사라졌다"고 보고 연결 끊김 오류를 띄우기 때문 (#18).
