@@ -29,6 +29,18 @@
 | `get_player_history` 닉네임별 전적 | `find_suspicious_records` 너무 빠른(조작 의심) 기록 찾기 |
 | | `delete_race` 레이스 기록 삭제 (되돌릴 수 없음) |
 
+**프롬프트** (AI 앱의 `/` 메뉴 등에 뜨는 바로 쓰는 질문. 최신 데이터를 담아서 줌)
+
+| 이름 | 하는 일 | 인자 |
+|---|---|---|
+| `room_briefing` | 지금 방 브리핑 | - |
+| `race_report` | 최근 레이스 리포트 | `count` (1~20, 기본 5) |
+| `player_profile` | 닉네임 선수 프로필 | `name` (필수) |
+| `leaderboard_post` | 단톡방용 순위 발표문 | `laps` (1~9, 기본 3) |
+| `cheat_audit` | [운영자] 의심 기록 점검 보고서 | `sec_per_lap` (기본 10) |
+
+**리소스** (AI 앱이 첨부처럼 읽어 가는 데이터, JSON): `turbo://game/info`, `turbo://room/status`, `turbo://leaderboard`, `turbo://races/recent`, 템플릿 `turbo://leaderboard/{laps}`, `turbo://players/{name}`
+
 연결 방법:
 
 ```bash
