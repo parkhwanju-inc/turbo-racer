@@ -601,8 +601,10 @@ function physics(l, inp, dt) {
     }
   }
 
-  // 다른 차와 부딪힘
-  const others = Object.values(remotes).concat(locals.filter((o) => o !== l && o.car).map((o) => o.car));
+  // 다른 차와 부딪힘 (리타이어·완주한 차는 멈춰 있으므로 통과)
+  const others = Object.keys(remotes).filter((id) => { const p = pinfo(id); return !p.dnf && !p.rank; })
+    .map((id) => remotes[id])
+    .concat(locals.filter((o) => o !== l && o.car && !o.car.finished).map((o) => o.car));
   for (const r of others) {
     const dx = car.x - r.x, dy = car.y - r.y, dl = Math.hypot(dx, dy);
     if (dl > 0.01 && dl < 36) {
