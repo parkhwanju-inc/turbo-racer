@@ -310,22 +310,30 @@ $("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.
 // ---------------------------------------------------------------- 대기실
 function renderLobby() {
   const ul = $("lobbyList");
-  ul.innerHTML = "";
   const ps = [...S.players].sort((a, b) => a.slot - b.slot);
   const hs = humans();
-  for (const p of ps) {
-    const l = localOf(p.id);
-    let tag;
-    if (p.ai) tag = "🤖 컴퓨터";
-    else if (l) tag = hs.length > 1 ? "⌨ " + SCHEMES[schemeOf(l)].label : "";
-    else tag = "📶 다른 기기";
-    const canRemove = l && (l.ai || hs.indexOf(l) > 0);
-    ul.append(el("li", {},
-      el("span", { className: "dot", style: { background: p.color } }),
-      el("span", { textContent: p.name }),
-      el("span", { className: "tag", textContent: tag }),
-      l && !l.ai && hs.indexOf(l) === 0 ? el("span", { className: "me", textContent: "나" }) : null,
-      canRemove ? el("button", { className: "x", textContent: "✕", title: "빼기", onclick: () => removeLocal(l) }) : null));
+  // 0.5초 폴링마다 목록을 새로 만들면 누르는 도중 ✕ 버튼이 바뀌어 클릭이 사라진다 (#19).
+  // 목록에 보이는 값이 바뀌었을 때만 다시 그린다.
+  const sig = JSON.stringify([ps.map((p) => [p.id, p.name, p.color, p.slot, p.ai]),
+    locals.map((l) => [l.id, l.ai])]);
+  if (ul.dataset.sig !== sig) {
+    ul.dataset.sig = sig;
+    ul.innerHTML = "";
+    for (const p of ps) {
+      const l = localOf(p.id);
+      let tag;
+      if (p.ai) tag = "🤖 컴퓨터";
+      else if (l) tag = hs.length > 1 ? "⌨ " + SCHEMES[schemeOf(l)].label : "";
+      else tag = "📶 다른 기기";
+      const canRemove = l && (l.ai || hs.indexOf(l) > 0);
+      ul.append(el("li", {},
+        el("span", { className: "dot", style: { background: p.color } }),
+        el("span", { textContent: p.name }),
+        el("span", { className: "tag", textContent: tag }),
+        l && !l.ai && hs.indexOf(l) === 0 ? el("span", { className: "me", textContent: "나" }) : null,
+        canRemove ? el("button", { className: "x", textContent: "✕", title: "빼기",
+          onclick: () => { const cur = localOf(p.id); if (cur) removeLocal(cur); } }) : null));
+    }
   }
   $("lobbyCount").textContent = ps.length;
   $("addLocalBtn").disabled = hs.length >= MAX_LOCAL_HUMANS || ps.length >= MAX_PLAYERS;
