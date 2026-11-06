@@ -118,7 +118,7 @@ const touchKeys = { up: false, down: false, left: false, right: false, nitro: fa
 
 // ---------------------------------------------------------------- 난이도 / 옵션
 const DIFF = {
-  //        grip: 미끄러짐(클수록 착 붙음)  turn: 핸들  grass: 잔디 속도  wall: 벽에 닿아도 유지되는 속도
+  //        grip: 미끄러짐(클수록 착 붙음)  turn: 핸들  grass: 잔디 속도  wall: 벽에 세게 부딪혀도 유지되는 속도
   //        assist: 자동 핸들 보조  charge: 부스터 1칸 차는 시간(초)  ai: 컴퓨터 실력
   easy:   { grip: 14, turn: 2.5, grass: 0.8, wall: 0.97, assist: 2.4, charge: 6,  start: 2, ai: [0.58, 0.68], aiNitro: 0.15 },
   normal: { grip: 10, turn: 2.7, grass: 0.6, wall: 0.9,  assist: 0.9, charge: 9,  start: 1, ai: [0.75, 0.87], aiNitro: 0.5 },
@@ -559,9 +559,12 @@ function physics(l, inp, dt) {
     car.x -= q.nx * over * sg;
     car.y -= q.ny * over * sg;
     const vn = car.vx * q.nx + car.vy * q.ny;
-    if (vn * sg > 0) { car.vx -= q.nx * vn * 1.15; car.vy -= q.ny * vn * 1.15; }
-    const keep = Math.pow(D.wall, dt * 60);
-    car.vx *= keep; car.vy *= keep;
+    if (vn * sg > 0) {
+      car.vx -= q.nx * vn * 1.15; car.vy -= q.ny * vn * 1.15;
+      // 벽 쪽으로 들어가는 속도(vn)만큼만 감속: 세게 박으면 D.wall 만큼, 살짝 스치면 거의 그대로
+      const keep = 1 - (1 - D.wall) * Math.min(1, Math.abs(vn) / 200);
+      car.vx *= keep; car.vy *= keep;
+    }
     if (D.assist) {   // 벽에 박으면 길 방향으로 차를 돌려줌
       let da = Math.atan2(q.ty, q.tx) - car.a;
       da = Math.atan2(Math.sin(da), Math.cos(da));
@@ -709,14 +712,15 @@ function drawView(vp) {
   // 카메라 (프레임 속도와 상관없이 부드럽게 따라감)
   const dt = FRAME_DT;
   const ease = (rate) => 1 - Math.exp(-rate * dt);
-  const base = Math.max(0.36, Math.min(1.2, Math.min(vp.w, vp.h) / 720));
+  // 큰 화면에서 너무 확대하면 앞이 안 보임 → 최대 0.85배 (최고 속도로 약 1.5초 앞까지 보임)
+  const base = Math.max(0.36, Math.min(0.85, Math.min(vp.w, vp.h) / 720));
   const spd = Math.hypot(car.vx, car.vy);
   const tz = base * (1 - Math.min(0.22, spd / 3000)) * (car.boost > 0 ? 0.92 : 1);
-  cam.z += (tz - cam.z) * ease(3);
+  cam.z += (tz - cam.z) * ease(1.5);
   if (opts.rotate) {
     let da = car.a - cam.a;
     da = Math.atan2(Math.sin(da), Math.cos(da));
-    cam.a += da * ease(5);
+    cam.a += da * ease(3);   // 천천히 돌아야 핸들 떨림·벽 충돌 때 화면이 덜 흔들림 (더 낮추면 코너에서 화면이 너무 늦게 따라옴)
     cam.x += (car.x + car.vx * 0.12 - cam.x) * ease(14);
     cam.y += (car.y + car.vy * 0.12 - cam.y) * ease(14);
     VIEW_ROT = -cam.a - Math.PI / 2;
