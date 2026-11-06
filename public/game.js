@@ -125,10 +125,12 @@ const DIFF = {
   hard:   { grip: 7,  turn: 2.9, grass: 0.4, wall: 0.8,  assist: 0,   charge: 12, start: 0, ai: [0.92, 1.00], aiNitro: 1 },
 };
 const diff = () => DIFF[(S && S.settings && S.settings.difficulty) || "easy"] || DIFF.easy;
+// OS 의 '동작 줄이기'(prefers-reduced-motion): 회전 카메라를 기본으로 끄고 움직이는 효과를 줄임
+const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 const opts = (() => {
   let o = {};
   try { o = JSON.parse(localStorage.getItem("tr_opts")) || {}; } catch (e) { /* ignore */ }
-  return { rotate: o.rotate !== false, autoGas: !!o.autoGas };
+  return { rotate: typeof o.rotate === "boolean" ? o.rotate : !REDUCED_MOTION, autoGas: !!o.autoGas };
 })();
 function saveOpts() { try { localStorage.setItem("tr_opts", JSON.stringify(opts)); } catch (e) { /* ignore */ } }
 
@@ -771,7 +773,7 @@ function drawView(vp) {
   }
   ctx.restore();
 
-  const blink = (performance.now() / 300) % 1;
+  const blink = REDUCED_MOTION ? 0 : (performance.now() / 1200) % 1;   // 화살표가 천천히 흐름
   for (const pi of PADS) {
     const q = T[pi];
     ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(Math.atan2(q.ty, q.tx));
@@ -790,11 +792,12 @@ function drawView(vp) {
   const tnow = performance.now();
   for (const b of BOXES) {
     if (b.back > tnow) continue;
-    ctx.save(); ctx.translate(b.x, b.y + Math.sin(tnow / 250 + b.x) * 3); ctx.rotate(tnow / 600);
+    // 고정 색, 살짝 떠 있는 움직임만 (예전: 계속 회전 + 무지개색)
+    ctx.save(); ctx.translate(b.x, b.y + (REDUCED_MOTION ? 0 : Math.sin(tnow / 500 + b.x) * 3));
     ctx.fillStyle = "rgba(0,0,0,.25)"; rr(-14, -10, 30, 30, 6); ctx.fill();
-    ctx.fillStyle = "hsl(" + ((tnow / 8 + b.x) % 360) + ",90%,60%)"; rr(-16, -16, 32, 32, 7); ctx.fill();
+    ctx.fillStyle = "#b26bff"; rr(-16, -16, 32, 32, 7); ctx.fill();
     ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
-    ctx.rotate(-tnow / 600 - VIEW_ROT);
+    ctx.rotate(-VIEW_ROT);
     ctx.fillStyle = "#fff"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("?", 0, 1);
     ctx.textBaseline = "alphabetic";
@@ -830,15 +833,18 @@ function drawView(vp) {
   ctx.restore();
 
   // 부스터 속도선
-  if (car.boost > 0) {
+  // 위치는 고정하고 바깥쪽으로 천천히 흐르게 (예전: 매 프레임 무작위 위치 → 초당 60번 번쩍임)
+  if (car.boost > 0 && !REDUCED_MOTION) {
     ctx.save();
     ctx.beginPath(); ctx.rect(vp.x, vp.y, vp.w, vp.h); ctx.clip();
-    const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2;
-    ctx.strokeStyle = "rgba(255,255,255," + (0.25 * Math.min(1, car.boost * 2)) + ")";
+    const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2, m = Math.min(vp.w, vp.h);
+    const fade = Math.min(1, car.boost * 2);
+    ctx.strokeStyle = "#fff";
     ctx.lineWidth = 2;
-    for (let i = 0; i < 26; i++) {
-      const ang = Math.random() * Math.PI * 2, r0 = Math.min(vp.w, vp.h) * (0.35 + Math.random() * 0.2);
-      const r1 = r0 + 40 + Math.random() * 80;
+    for (let i = 0; i < 14; i++) {
+      const ang = i * 2.39996 + 0.3, ph = (tnow / 1400 + i * 0.618) % 1;   // 황금각으로 고르게 퍼뜨림
+      const r0 = m * (0.36 + ph * 0.22), r1 = r0 + 40 + (i % 3) * 20;
+      ctx.globalAlpha = 0.16 * fade * Math.sin(ph * Math.PI);   // 생길 때·사라질 때 서서히
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
       ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
@@ -856,7 +862,7 @@ function drawCar(x, y, a, color, name, isMine, ghost, boost, z) {
   ctx.save();
   ctx.rotate(a);
   if (boost) {
-    const len = 30 + Math.random() * 22;
+    const len = REDUCED_MOTION ? 40 : 40 + Math.sin(performance.now() / 110) * 8;   // 부드럽게 일렁임
     ctx.fillStyle = "rgba(255,120,30,.9)";
     ctx.beginPath(); ctx.moveTo(-22, -10); ctx.lineTo(-22 - len, 0); ctx.lineTo(-22, 10); ctx.fill();
     ctx.fillStyle = "rgba(255,240,120,.95)";
