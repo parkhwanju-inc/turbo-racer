@@ -125,10 +125,12 @@ const DIFF = {
   hard:   { grip: 7,  turn: 2.9, grass: 0.4, wall: 0.8,  assist: 0,   charge: 12, start: 0, ai: [0.92, 1.00], aiNitro: 1 },
 };
 const diff = () => DIFF[(S && S.settings && S.settings.difficulty) || "easy"] || DIFF.easy;
+// OS에서 '동작 줄이기'를 켠 사람: 회전 카메라를 기본으로 끄고 깜빡임·속도선 같은 효과를 뺀다
+const REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 const opts = (() => {
   let o = {};
   try { o = JSON.parse(localStorage.getItem("tr_opts")) || {}; } catch (e) { /* ignore */ }
-  return { rotate: o.rotate !== false, autoGas: !!o.autoGas };
+  return { rotate: o.rotate === undefined ? !REDUCED : o.rotate !== false, autoGas: !!o.autoGas };
 })();
 function saveOpts() { try { localStorage.setItem("tr_opts", JSON.stringify(opts)); } catch (e) { /* ignore */ } }
 
@@ -550,9 +552,13 @@ function physics(l, inp, dt) {
     car.x -= q.nx * over * sg;
     car.y -= q.ny * over * sg;
     const vn = car.vx * q.nx + car.vy * q.ny;
-    if (vn * sg > 0) { car.vx -= q.nx * vn * 1.15; car.vy -= q.ny * vn * 1.15; }
-    const keep = Math.pow(D.wall, dt * 60);
-    car.vx *= keep; car.vy *= keep;
+    if (vn * sg > 0) {
+      car.vx -= q.nx * vn * 1.15; car.vy -= q.ny * vn * 1.15;
+      // 속도 손실은 벽 쪽으로 박는 세기(vn)에 비례. 예전엔 벽에 닿아 미끄러지는 동안 물리 스텝마다
+      // 깎여서, 쉬움에서도 1초 스치면 속도가 1/6로 줄었다. 정면으로 박을 때(|vn|≥200)는 예전과 비슷하다.
+      const keep = 1 - (1 - D.wall) * Math.min(1, Math.abs(vn) / 200);
+      car.vx *= keep; car.vy *= keep;
+    }
     if (D.assist) {   // 벽에 박으면 길 방향으로 차를 돌려줌
       let da = Math.atan2(q.ty, q.tx) - car.a;
       da = Math.atan2(Math.sin(da), Math.cos(da));
@@ -700,14 +706,15 @@ function drawView(vp) {
   // 카메라 (프레임 속도와 상관없이 부드럽게 따라감)
   const dt = FRAME_DT;
   const ease = (rate) => 1 - Math.exp(-rate * dt);
-  const base = Math.max(0.36, Math.min(1.2, Math.min(vp.w, vp.h) / 720));
+  // 최대 배율 1.2 → 0.85: 큰 화면에서 너무 확대돼 앞이 1초 남짓밖에 안 보이던 것을 넓힘
+  const base = Math.max(0.36, Math.min(0.85, Math.min(vp.w, vp.h) / 720));
   const spd = Math.hypot(car.vx, car.vy);
-  const tz = base * (1 - Math.min(0.22, spd / 3000)) * (car.boost > 0 ? 0.92 : 1);
-  cam.z += (tz - cam.z) * ease(3);
+  const tz = base * (1 - Math.min(0.22, spd / 3000)) * (car.boost > 0 ? 0.95 : 1);
+  cam.z += (tz - cam.z) * ease(1.5);
   if (opts.rotate) {
     let da = car.a - cam.a;
     da = Math.atan2(Math.sin(da), Math.cos(da));
-    cam.a += da * ease(5);
+    cam.a += da * ease(2.5);   // 회전을 천천히 따라가 핸들 떨림·벽 충돌 때 화면이 휙휙 돌지 않게
     cam.x += (car.x + car.vx * 0.12 - cam.x) * ease(14);
     cam.y += (car.y + car.vy * 0.12 - cam.y) * ease(14);
     VIEW_ROT = -cam.a - Math.PI / 2;
@@ -762,7 +769,7 @@ function drawView(vp) {
   }
   ctx.restore();
 
-  const blink = (performance.now() / 300) % 1;
+  const blink = REDUCED ? 0 : (performance.now() / 900) % 1;   // 0.3초 → 0.9초 주기
   for (const pi of PADS) {
     const q = T[pi];
     ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(Math.atan2(q.ty, q.tx));
@@ -777,15 +784,16 @@ function drawView(vp) {
     ctx.restore();
   }
 
-  // ? 상자
+  // ? 상자 (예전엔 12개가 계속 돌면서 무지개색으로 바뀌어 눈이 피로했음 → 고정 색, 살짝 떠 있기만)
   const tnow = performance.now();
   for (const b of BOXES) {
     if (b.back > tnow) continue;
-    ctx.save(); ctx.translate(b.x, b.y + Math.sin(tnow / 250 + b.x) * 3); ctx.rotate(tnow / 600);
+    ctx.save(); ctx.translate(b.x, b.y + (REDUCED ? 0 : Math.sin(tnow / 400 + b.x) * 3));
+    ctx.rotate(Math.PI / 4 - VIEW_ROT);
     ctx.fillStyle = "rgba(0,0,0,.25)"; rr(-14, -10, 30, 30, 6); ctx.fill();
-    ctx.fillStyle = "hsl(" + ((tnow / 8 + b.x) % 360) + ",90%,60%)"; rr(-16, -16, 32, 32, 7); ctx.fill();
+    ctx.fillStyle = "#ffb627"; rr(-16, -16, 32, 32, 7); ctx.fill();
     ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
-    ctx.rotate(-tnow / 600 - VIEW_ROT);
+    ctx.rotate(-Math.PI / 4);
     ctx.fillStyle = "#fff"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("?", 0, 1);
     ctx.textBaseline = "alphabetic";
@@ -820,16 +828,20 @@ function drawView(vp) {
   }
   ctx.restore();
 
-  // 부스터 속도선
-  if (car.boost > 0) {
+  // 부스터 속도선: 예전엔 매 프레임 26개를 무작위 위치에 다시 그려 초당 60번 번쩍였다.
+  // 위치를 고정하고 바깥으로 천천히 흐르게 해서 깜빡임을 없앤다.
+  if (car.boost > 0 && !REDUCED) {
     ctx.save();
     ctx.beginPath(); ctx.rect(vp.x, vp.y, vp.w, vp.h); ctx.clip();
     const cx = vp.x + vp.w / 2, cy = vp.y + vp.h / 2;
-    ctx.strokeStyle = "rgba(255,255,255," + (0.25 * Math.min(1, car.boost * 2)) + ")";
+    ctx.strokeStyle = "rgba(255,255,255," + (0.18 * Math.min(1, car.boost * 2)) + ")";
     ctx.lineWidth = 2;
-    for (let i = 0; i < 26; i++) {
-      const ang = Math.random() * Math.PI * 2, r0 = Math.min(vp.w, vp.h) * (0.35 + Math.random() * 0.2);
-      const r1 = r0 + 40 + Math.random() * 80;
+    const ts = tnow / 1000;
+    for (let i = 0; i < 14; i++) {
+      const ang = (i / 14) * Math.PI * 2 + 0.2 * Math.sin(i * 7.3);
+      const ph = (ts * 1.2 + i * 0.37) % 1;
+      const r0 = Math.min(vp.w, vp.h) * (0.38 + 0.14 * ph);
+      const r1 = r0 + 70;
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
       ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
@@ -847,7 +859,7 @@ function drawCar(x, y, a, color, name, isMine, ghost, boost, z) {
   ctx.save();
   ctx.rotate(a);
   if (boost) {
-    const len = 30 + Math.random() * 22;
+    const len = 30 + (REDUCED ? 11 : 11 * (1 + Math.sin(performance.now() / 70)));   // 무작위 대신 부드럽게 일렁임
     ctx.fillStyle = "rgba(255,120,30,.9)";
     ctx.beginPath(); ctx.moveTo(-22, -10); ctx.lineTo(-22 - len, 0); ctx.lineTo(-22, 10); ctx.fill();
     ctx.fillStyle = "rgba(255,240,120,.95)";
