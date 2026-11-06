@@ -226,7 +226,7 @@ async function netTick() {
   if (busy || screen === "join" || !locals.length) return;
   const now = Date.now();
   const racing = screen === "game" && S && S.phase === "racing";
-  if (now - lastPoll < (racing ? 60 : 500)) return;
+  if (now - lastPoll < (racing ? 90 : 500)) return; // 레이스 중 약 100ms(30ms 틱이라 실제 ~93ms). 다른 차는 updateRemotes 가 보간 (#8)
   lastPoll = now;
   busy = true;
   try {
