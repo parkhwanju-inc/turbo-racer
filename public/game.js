@@ -178,8 +178,8 @@ async function api(path, body) {
   const t0 = Date.now();
   const res = await fetch(path, body === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  });
-  const data = await res.json();
+  }).catch((e) => netError(e));
+  const data = await res.json().catch((e) => netError(e, res)); // HTML 오류 페이지(502 등)도 한국어 안내로
   const t1 = Date.now();
   if (data && typeof data.now === "number") {
     const rtt = t1 - t0;
@@ -188,8 +188,19 @@ async function api(path, body) {
       offset = data.now - (t0 + t1) / 2000;
     }
   }
-  if (!res.ok) throw new Error(data.error || "오류");
+  if (!res.ok) throw Object.assign(new Error(data.error || "오류"), { status: res.status });
   return data;
+}
+
+// 네트워크 오류·JSON 이 아닌 응답을 "Failed to fetch" 같은 원문 대신 한국어 문구로 바꿔 던진다 (#24)
+function netError(e, res) {
+  let msg;
+  if (e && (e.name === "TimeoutError" || e.name === "AbortError")) msg = "서버 응답이 너무 늦어요. 잠시 후 다시 해 주세요";
+  else if (!res) msg = "서버에 연결할 수 없어요. 인터넷 연결을 확인해 주세요";
+  else if (res.status >= 500) msg = "서버에 잠시 문제가 있어요 (오류 " + res.status + "). 잠시 후 다시 해 주세요";
+  else msg = "서버 응답을 읽지 못했어요 (오류 " + res.status + ")";
+  console.warn(e);
+  throw Object.assign(new Error(msg), { status: res && !res.ok ? res.status : undefined });
 }
 
 async function netTick() {
@@ -301,10 +312,43 @@ $("joinBtn").onclick = async () => {
   localStorage.setItem("tr_name", name);
   $("joinErr").textContent = "";
   $("joinBtn").disabled = true;
+  const wait = ++joinWait;
   try { await addLocal({ name, color: myColor }); }
-  catch (e) { $("joinErr").textContent = e.message; }
+  catch (e) {
+    $("joinErr").textContent = e.message;
+    if (e.status === 409) waitForLobby(wait, name);
+  }
   $("joinBtn").disabled = false;
 };
+
+// 레이스 중이라 참가가 막히면(409) 방 상태를 보다가 대기실로 돌아오면 자동으로 참가한다 (#24).
+// 참가하기를 다시 누르면 이전 대기는 멈춘다. 대기실인데도 409 면(방이 가득 참 등) 기다리지 않는다.
+let joinWait = 0;
+async function waitForLobby(wait, name) {
+  let racing = false;
+  for (;;) {
+    let st = null;
+    try { st = await api("/api/state"); } catch (e) { /* 잠깐 끊겨도 계속 기다림 */ }
+    if (wait !== joinWait || screen !== "join") return;
+    if (st && st.phase === "lobby") {
+      if (!racing) return;
+      $("joinBtn").disabled = true;
+      try { await addLocal({ name, color: myColor }); $("joinErr").textContent = ""; return; }
+      catch (e) {
+        if (wait !== joinWait) return;
+        $("joinErr").textContent = e.message;
+        if (e.status !== 409) return;
+        racing = false;
+        continue;
+      } finally { $("joinBtn").disabled = false; }
+    }
+    if (st) {
+      racing = true;
+      $("joinErr").textContent = "레이스가 진행 중이에요. 레이스가 끝나면 자동으로 참가해요";
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+}
 $("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) $("joinBtn").click(); });
 
 // ---------------------------------------------------------------- 대기실
@@ -429,7 +473,12 @@ document.querySelectorAll("[data-show-board]").forEach((b) => (b.onclick = openB
 $("boardClose").onclick = () => $("board").classList.remove("active");
 async function openBoard() {
   $("board").classList.add("active");
-  const d = await api("/api/leaderboard");
+  $("boardTotal").textContent = "불러오는 중…";
+  $("bestRows").innerHTML = "";
+  $("winRows").innerHTML = "";
+  let d;
+  try { d = await api("/api/leaderboard"); }
+  catch (e) { $("boardTotal").textContent = "명예의 전당을 불러오지 못했어요. " + e.message; return; }
   $("boardTotal").textContent = "지금까지 " + d.total_races + "번의 레이스 (컴퓨터 기록은 제외)";
   const b = $("bestRows"); b.innerHTML = "";
   d.best.forEach((r, i) => b.append(el("tr", {},
