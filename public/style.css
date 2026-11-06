@@ -39,6 +39,8 @@ input:focus { border-color: #ffd23d; }
 .link { background: none; border: 0; color: #9fc2ff; margin-top: 14px; font-size: 15px; }
 .row { display: flex; justify-content: space-between; }
 .err { color: #ff8080; min-height: 1em; font-size: 14px; }
+.note { color: #ffd23d; font-size: 14px; margin: 10px 0 0; }
+.note:empty { display: none; }
 
 .plist { list-style: none; padding: 0; margin: 0 0 8px; text-align: left; }
 .plist li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 6px 0;

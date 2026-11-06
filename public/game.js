@@ -242,8 +242,12 @@ function onState(s) {
   for (const id in remotes) if (!ids.has(id) || localOf(id)) delete remotes[id];
 
   if (s.phase === "lobby") {
-    if (screen !== "lobby") show("lobby");
-    renderLobby();
+    // 다른 사람이 "다시 하기"를 눌러도 결과 화면은 내가 확인을 누를 때까지 둔다 (#21)
+    if (screen === "results") showRoomBackNote();
+    else {
+      if (screen !== "lobby") show("lobby");
+      renderLobby();
+    }
   } else if (s.phase === "racing") {
     if (screen !== "game") startRace();
   } else if (s.phase === "finished") {
@@ -399,6 +403,8 @@ $("leaveBtn").onclick = () => {
 
 // ---------------------------------------------------------------- 결과
 function renderResults() {
+  $("resultNote").textContent = "";
+  $("againBtn").textContent = "다시 하기";
   const rs = S.results || [];
   const nm = (r) => (r.ai ? "🤖 " : "") + r.name;
   const pod = $("podium");
@@ -420,8 +426,21 @@ function renderResults() {
       el("td", { textContent: fmt(r.time_ms) })));
   });
 }
+function showRoomBackNote() {
+  $("resultNote").textContent = "다른 사람이 '다시 하기'를 눌러 방이 대기실로 돌아갔어요. 그사이 누가 레이스를 시작하면 함께 출발해요.";
+  $("againBtn").textContent = "확인";
+}
 $("againBtn").onclick = async () => {
-  try { onState(await api("/api/reset", { id: humans()[0].id })); } catch (e) { alert(e.message); }
+  if (S && S.phase === "finished") {
+    let s;
+    try { s = await api("/api/reset", { id: humans()[0].id }); } catch (e) { alert(e.message); return; }
+    if (screen !== "results") return; // 기다리는 사이 다른 화면으로 넘어갔으면 그대로 둔다
+    show("lobby");
+    onState(s);
+  } else if (S && S.phase === "lobby") {
+    show("lobby"); // 이미 대기실로 돌아간 방: 내 화면만 넘긴다
+    renderLobby();
+  }
 };
 
 // 명예의 전당
