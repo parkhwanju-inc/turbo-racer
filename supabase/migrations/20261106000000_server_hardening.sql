@@ -193,7 +193,7 @@ begin
     if v_name = '' then v_name := '플레이어'; end if;
     perform public.tr_tick();
     select * into r from public.tr_room where id = 1;
-    if public.tr_truthy(b->'rejoin') then
+    if public.tr_truthy(b->'rejoin') or pid is not null then  -- id 를 보낸 예전 클라이언트도 재접속으로
       -- 새로고침 후 재접속: 모르는 id 거나 토큰이 틀리면 새로 만들지 않음
       if not public.tr_authed(b, pid) then
         return jsonb_build_object('status', 404, 'body',

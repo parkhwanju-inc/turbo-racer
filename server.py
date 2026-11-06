@@ -282,7 +282,7 @@ def api_join(body):
     pid = body.get("id")
     with lock:
         tick()
-        if body.get("rejoin"):                  # 새로고침 후 재접속: 모르는 id 면 새로 만들지 않음
+        if body.get("rejoin") or pid is not None:  # 재접속 (id 를 보낸 예전 클라이언트 포함): 모르는 id 면 새로 만들지 않음
             if not authed(body, pid):
                 return 404, {"error": "참가 정보가 없어요. 다시 참가해 주세요."}
             touch(pid)
