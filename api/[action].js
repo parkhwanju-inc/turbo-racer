@@ -39,7 +39,9 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: '서버 설정(SUPABASE_URL / SUPABASE_ANON_KEY)이 없어요' });
   }
 
-  const body = action === 'state' ? { ids: idsFromQuery(req.query) } : req.method === 'POST' ? readBody(req) : {};
+  const body = action === 'state' ? { ids: idsFromQuery(req.query) }
+    : action === 'leaderboard' ? { laps: [].concat(req.query.laps || [])[0] || null }
+    : req.method === 'POST' ? readBody(req) : {};
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/tr_api`, {
       method: 'POST',

@@ -140,7 +140,7 @@ const BOXES = BOX_ROWS.flatMap((i) => [-55, 0, 55].map((lat) => ({
 const MAX_CHARGES = 3;
 
 // ---------------------------------------------------------------- 상태
-// locals: 이 브라우저가 맡은 플레이어들 {id, ai, skill, lane, car, cam, ...}
+// locals: 이 브라우저가 맡은 플레이어들 {id, token, ai, skill, lane, car, cam, ...}
 let locals = loadLocals();
 let myColor = localStorage.getItem("tr_color") || COLORS[Math.floor(Math.random() * COLORS.length)];
 let S = null;
@@ -165,17 +165,23 @@ function loadLocals() {
   catch (e) { return []; }
 }
 function saveLocals() {
-  try { sessionStorage.setItem("tr_locals", JSON.stringify(locals.map((l) => ({ id: l.id, ai: l.ai })))); }
+  try { sessionStorage.setItem("tr_locals", JSON.stringify(locals.map((l) => ({ id: l.id, token: l.token, ai: l.ai })))); }
   catch (e) { /* ignore */ }
 }
 function newLocal(o) {
-  return { id: o.id, ai: !!o.ai, skill: 0.8 + Math.random() * 0.13, lane: (Math.random() - 0.5) * 70,
+  return { id: o.id, token: o.token, ai: !!o.ai, skill: 0.8 + Math.random() * 0.13, lane: (Math.random() - 0.5) * 70,
            car: null, cam: { x: 0, y: 0, z: 1 }, stuck: 0, rev: 0 };
 }
 
 // ---------------------------------------------------------------- 네트워크
 async function api(path, body) {
   const t0 = Date.now();
+  if (body !== undefined) {
+    // 이 브라우저가 맡은 플레이어들의 비밀 토큰 (서버가 쓰기 요청을 확인함)
+    const tokens = {};
+    for (const l of locals) if (l.token) tokens[l.id] = l.token;
+    body = Object.assign({}, body, { tokens });
+  }
   const res = await fetch(path, body === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
@@ -188,7 +194,7 @@ async function api(path, body) {
       offset = data.now - (t0 + t1) / 2000;
     }
   }
-  if (!res.ok) throw new Error(data.error || "오류");
+  if (!res.ok) throw Object.assign(new Error(data.error || "오류"), { status: res.status });
   return data;
 }
 
@@ -289,7 +295,7 @@ renderColors();
 
 async function addLocal(body) {
   const s = await api("/api/join", body);
-  if (!localOf(s.me)) locals.push(newLocal({ id: s.me, ai: body.ai }));
+  if (!localOf(s.me)) locals.push(newLocal({ id: s.me, token: s.token, ai: body.ai }));
   saveLocals();
   if (screen === "join") show("lobby");
   onState(s);
@@ -429,8 +435,9 @@ document.querySelectorAll("[data-show-board]").forEach((b) => (b.onclick = openB
 $("boardClose").onclick = () => $("board").classList.remove("active");
 async function openBoard() {
   $("board").classList.add("active");
-  const d = await api("/api/leaderboard");
+  const d = await api("/api/leaderboard?laps=" + ((S && S.laps) || 3));
   $("boardTotal").textContent = "지금까지 " + d.total_races + "번의 레이스 (컴퓨터 기록은 제외)";
+  $("bestRows").closest("div").querySelector("h3").textContent = "최고 기록 TOP 10 (" + d.laps + "바퀴 기준)";
   const b = $("bestRows"); b.innerHTML = "";
   d.best.forEach((r, i) => b.append(el("tr", {},
     el("td", { textContent: i + 1 }),
@@ -1050,7 +1057,8 @@ document.querySelectorAll("#touch button").forEach((b) => {
   const kept = [];
   let last = null;
   for (const l of locals) {
-    try { last = await api("/api/join", { id: l.id }); kept.push(l); } catch (e) { /* 빠짐 */ }
+    // 서버가 모르는 id(404)면 새로 만들지 않고 빠짐
+    try { last = await api("/api/join", { id: l.id, rejoin: true }); kept.push(l); } catch (e) { /* 빠짐 */ }
   }
   locals = kept;
   saveLocals();

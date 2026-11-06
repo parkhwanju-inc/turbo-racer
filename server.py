@@ -6,8 +6,11 @@ Python 3.7+ 표준 라이브러리만 사용 (설치 필요 없음)
 실행:  py server.py
 접속:  같은 와이파이의 기기에서 http://<이 PC의 IP>:5050
 """
+import hashlib
 import json
+import math
 import os
+import secrets
 import socket
 import sqlite3
 import threading
@@ -27,6 +30,9 @@ STALE_SEC = 10          # 이 시간 동안 응답 없으면 로비에서 제외
 FINISH_GRACE_SEC = 30   # 1등 도착 후 남은 사람 기다리는 시간
 MAX_RACE_SEC = 600
 COUNTDOWN_SEC = 3.5
+MIN_LAP_SEC = 8         # 완주 최소 시간(바퀴당). 부스터 최고속도로 계속 달려도 바퀴당 약 9.4초
+FINISH_SLACK = 0.05     # 완주 인정: 서버에 저장된 진행도가 laps - 이 값 이상
+MAX_LAPS_PER_SEC = 0.12 # 마지막 update 이후 갈 수 있는 최대 진행도(부스터 최고속도 약 0.106바퀴/초)
 COLORS = ["#ff4d4d", "#3d8bff", "#ffd23d", "#3ddc84",
           "#b26bff", "#ff8c2e", "#2ee6e6", "#ff6fcf"]
 
@@ -74,17 +80,20 @@ def init_db():
         cols = [r[1] for r in con.execute("PRAGMA table_info(results)")]
         if "is_bot" not in cols:  # 예전 버전 DB 업그레이드
             con.execute("ALTER TABLE results ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0")
+        cols = [r[1] for r in con.execute("PRAGMA table_info(races)")]
+        if "laps" not in cols:  # 바퀴 수 (예전 기록은 NULL = 알 수 없음)
+            con.execute("ALTER TABLE races ADD COLUMN laps INTEGER")
 
 
 def ts(t):
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t))
 
 
-def save_race(results, start_at, end_at):
+def save_race(results, start_at, end_at, laps):
     with db() as con:
         cur = con.execute(
-            "INSERT INTO races(started_at, finished_at, player_count) VALUES (?,?,?)",
-            (ts(start_at), ts(end_at), len(results)))
+            "INSERT INTO races(started_at, finished_at, player_count, laps) VALUES (?,?,?,?)",
+            (ts(start_at), ts(end_at), len(results), laps))
         rid = cur.lastrowid
         for r in results:
             con.execute(
@@ -95,21 +104,65 @@ def save_race(results, start_at, end_at):
     return rid
 
 
-def leaderboard():
+# 사람이 한 명이라도 완주한 레이스만 집계 (예전에 저장된 완주자 없는 레이스 제외)
+COUNTED = ("EXISTS (SELECT 1 FROM results h WHERE h.race_id = {0} "
+           "AND h.finished=1 AND h.is_bot=0)")
+
+
+def leaderboard(laps):
+    """laps: 이 바퀴 수 레이스의 기록만 최고 기록에 넣음 (바퀴 수를 모르는 예전 기록은 제외)"""
     with db() as con:
         best = [dict(r) for r in con.execute(
             "SELECT player_name, color, time_ms, r.started_at AS date FROM results "
             "JOIN races r ON r.id = results.race_id "
-            "WHERE finished=1 AND is_bot=0 ORDER BY time_ms ASC LIMIT 10")]
+            "WHERE finished=1 AND is_bot=0 AND r.laps=? ORDER BY time_ms ASC LIMIT 10", (laps,))]
         wins = [dict(r) for r in con.execute(
             "SELECT player_name, "
             "SUM(CASE WHEN rank=1 THEN 1 ELSE 0 END) AS gold, "
             "SUM(CASE WHEN rank=2 THEN 1 ELSE 0 END) AS silver, "
             "SUM(CASE WHEN rank=3 THEN 1 ELSE 0 END) AS bronze, "
-            "COUNT(*) AS races FROM results WHERE is_bot=0 GROUP BY player_name "
+            "COUNT(*) AS races FROM results WHERE is_bot=0 AND " + COUNTED.format("results.race_id") +
+            " GROUP BY player_name "
             "ORDER BY gold DESC, silver DESC, bronze DESC, races DESC LIMIT 10")]
-        total = con.execute("SELECT COUNT(*) FROM races").fetchone()[0]
-    return {"best": best, "wins": wins, "total_races": total}
+        total = con.execute("SELECT COUNT(*) FROM races WHERE " + COUNTED.format("races.id")).fetchone()[0]
+    return {"best": best, "wins": wins, "total_races": total, "laps": laps}
+
+
+# ---------------------------------------------------------------- 입력 검증 / 인증
+def num(v, default=None):
+    """유한한 숫자만 받음. 없으면 default, 숫자가 아니거나 NaN/Infinity 면 ValueError"""
+    if v is None:
+        if default is None:
+            raise ValueError("missing")
+        return default
+    if isinstance(v, bool) or not isinstance(v, (int, float, str)):
+        raise ValueError("not a number")
+    f = float(v)
+    if not math.isfinite(f):
+        raise ValueError("not finite")
+    return f
+
+
+def hash_token(t):
+    return hashlib.sha256(t.encode("utf-8")).hexdigest()
+
+
+def authed(body, pid):
+    """body.tokens[pid] 가 pid 의 비밀 토큰과 맞으면 그 플레이어 dict, 아니면 None"""
+    if not isinstance(pid, str):
+        return None
+    p = room["players"].get(pid)
+    tokens = body.get("tokens")
+    if not p or not isinstance(tokens, dict):
+        return None
+    t = tokens.get(pid)
+    if not isinstance(t, str) or not secrets.compare_digest(hash_token(t), p["token_hash"]):
+        return None
+    return p
+
+
+def bad_auth():
+    return 403, {"error": "플레이어 확인에 실패했어요. 다시 참가해 주세요."}
 
 
 # ---------------------------------------------------------------- game logic (lock must be held)
@@ -148,21 +201,20 @@ def end_race(now):
                         "time_ms": None, "finished": False, "ai": p["ai"]})
     room["results"] = results
     room["phase"] = "finished"
-    try:
-        room["race_id"] = save_race(results, room["start_at"], now)
-    except Exception as e:  # DB 오류가 게임을 멈추지 않도록
-        print("DB 저장 실패:", e)
+    room["race_id"] = None
+    # 사람이 한 명도 완주하지 못한 레이스(모두 나감/리타이어)는 기록하지 않음
+    if any(r["finished"] and not r["ai"] for r in results):
+        try:
+            room["race_id"] = save_race(results, room["start_at"], now, room["settings"]["laps"])
+        except Exception as e:  # DB 오류가 게임을 멈추지 않도록
+            print("DB 저장 실패:", e)
     bump()
 
 
 def tick():
     now = time.time()
     players = room["players"]
-    if room["phase"] in ("lobby", "finished"):
-        for pid in [pid for pid, p in players.items() if now - p["seen"] > STALE_SEC]:
-            del players[pid]
-            bump()
-    elif room["phase"] == "racing":
+    if room["phase"] == "racing":
         for p in players.values():
             if p["rank"] is None and not p["dnf"] and now - p["seen"] > STALE_SEC:
                 p["dnf"] = True
@@ -174,6 +226,11 @@ def tick():
             end_race(now)
         elif now - room["start_at"] > MAX_RACE_SEC:
             end_race(now)
+    # 레이스가 방금 끝났어도 같은 tick 에서 접속이 끊긴 사람을 정리 → 아무도 없으면 바로 대기실로
+    if room["phase"] in ("lobby", "finished"):
+        for pid in [pid for pid, p in players.items() if now - p["seen"] > STALE_SEC]:
+            del players[pid]
+            bump()
     if not players and room["phase"] != "lobby":
         reset_room()
 
@@ -225,7 +282,9 @@ def api_join(body):
     pid = body.get("id")
     with lock:
         tick()
-        if pid in room["players"]:              # 새로고침 후 재접속
+        if body.get("rejoin"):                  # 새로고침 후 재접속: 모르는 id 면 새로 만들지 않음
+            if not authed(body, pid):
+                return 404, {"error": "참가 정보가 없어요. 다시 참가해 주세요."}
             touch(pid)
             return 200, public_state(pid)
         if room["phase"] != "lobby":
@@ -234,49 +293,56 @@ def api_join(body):
         if slot is None:
             return 409, {"error": "방이 가득 찼어요 (최대 %d명)" % MAX_PLAYERS}
         pid = uuid.uuid4().hex[:12]
+        token = secrets.token_hex(16)
+        color = body.get("color") if isinstance(body.get("color"), str) else None
         room["players"][pid] = {
-            "name": name, "color": pick_color(body.get("color")), "slot": slot,
+            "name": name, "color": pick_color(color), "slot": slot,
+            "token_hash": hash_token(token), "moved": 0.0,
             "seen": time.time(), "x": 0, "y": 0, "a": 0, "v": 0,
             "progress": -1, "lap": 0, "rank": None, "time_ms": None, "dnf": False,
             "ai": bool(body.get("ai")),
         }
         bump()
-        return 200, public_state(pid)
+        st = public_state(pid)
+        st["token"] = token                     # 참가한 브라우저에만 이 응답으로 한 번 돌려줌
+        return 200, st
 
 
 def api_leave(body):
     with lock:
         pid = body.get("id")
-        if pid in room["players"]:
-            if room["phase"] == "racing":
-                room["players"][pid]["dnf"] = True
-            else:
-                del room["players"][pid]
-            bump()
+        p = authed(body, pid)
+        if not p:
+            return bad_auth()
+        if room["phase"] == "racing":
+            p["dnf"] = True
+            p["seen"] = 0.0     # 나간 사람: 레이스가 끝나는 tick 에서 바로 정리됨
+        else:
+            del room["players"][pid]
+        bump()
         tick()
         return 200, {"ok": True}
 
 
 def api_state(ids):
+    """읽기 전용 (토큰이 없으니 접속 유지 표시도 하지 않음)"""
     with lock:
-        for pid in ids:
-            touch(pid)
         tick()
         return 200, public_state(ids[0] if ids else None)
 
 
-def apply_car(c):
-    p = touch(c.get("id"))
-    if p and room["phase"] == "racing" and p["rank"] is None and not p["dnf"]:
+def apply_car(p, c):
+    if room["phase"] == "racing" and p["rank"] is None and not p["dnf"]:
         try:
-            p["x"] = float(c.get("x", 0))
-            p["y"] = float(c.get("y", 0))
-            p["a"] = float(c.get("a", 0))
-            p["v"] = float(c.get("v", 0))
-            p["progress"] = float(c.get("progress", 0))
-            p["lap"] = int(c.get("lap", 0))
-        except (TypeError, ValueError):
-            pass
+            vals = {k: num(c.get(k), 0.0) for k in ("x", "y", "a", "v", "progress", "lap")}
+            if abs(vals["lap"]) > 1000:
+                raise ValueError("lap")
+        except (TypeError, ValueError, OverflowError):
+            return  # 이상한 값이 하나라도 있으면 그 차는 무시
+        for k in ("x", "y", "a", "v", "progress"):
+            p[k] = vals[k]
+        p["lap"] = int(vals["lap"])
+        p["moved"] = time.time()
 
 
 def api_update(body):
@@ -284,13 +350,18 @@ def api_update(body):
     body: {ids: [...살아있음 표시], cars: [{id,x,y,a,v,progress,lap}, ...]}
     (예전 형식 {id, x, y, ...} 도 받음)"""
     cars = body.get("cars") if isinstance(body.get("cars"), list) else [body]
-    ids = [i for i in (body.get("ids") or []) if isinstance(i, str)][:MAX_PLAYERS]
+    ids = body.get("ids") if isinstance(body.get("ids"), list) else []
+    ids = [i for i in ids if isinstance(i, str)][:MAX_PLAYERS]
     with lock:
+        # 토큰이 맞는 id 만 접속 유지·위치 반영 (나머지는 조용히 무시)
         for pid in ids:
-            touch(pid)
+            if authed(body, pid):
+                touch(pid)
         for c in cars[:MAX_PLAYERS]:
-            if isinstance(c, dict):
-                apply_car(c)
+            p = authed(body, c.get("id")) if isinstance(c, dict) else None
+            if p:
+                p["seen"] = time.time()
+                apply_car(p, c)
         tick()
         first = ids[0] if ids else body.get("id")
         return 200, public_state(first)
@@ -301,7 +372,7 @@ def api_start(body):
         tick()
         if room["phase"] != "lobby":
             return 409, {"error": "이미 시작했어요"}
-        if body.get("id") not in room["players"]:
+        if not authed(body, body.get("id")):
             return 403, {"error": "참가한 플레이어만 시작할 수 있어요"}
         now = time.time()
         room["phase"] = "racing"
@@ -319,21 +390,33 @@ def api_start(body):
 def api_finish(body):
     pid = body.get("id")
     with lock:
-        p = touch(pid)
+        p = authed(body, pid)
+        if not p:
+            return bad_auth()
+        touch(pid)
         now = time.time()
-        if not p or room["phase"] != "racing":
+        if room["phase"] != "racing":
             return 409, {"error": "레이스 중이 아니에요"}
         if p["rank"] is not None:
             return 200, public_state(pid)
+        if p["dnf"]:
+            return 409, {"error": "리타이어 처리돼서 완주로 인정되지 않아요"}
         elapsed = now - room["start_at"]
-        # 최소 검증: 바퀴 수를 다 돌았고, 말도 안 되게 빠르지 않을 것
         laps = room["settings"]["laps"]
-        if int(body.get("lap", 0)) < laps or elapsed < 4 * laps:
+        try:
+            lap = num(body.get("lap"), 0.0)
+        except (TypeError, ValueError):
+            return 400, {"error": "완주가 확인되지 않았어요"}
+        # 완주 판정은 서버에 저장된 진행도(update 로 받은 값) 기준.
+        # 마지막 update 이후(최대 2초) 갈 수 있었던 만큼은 봐줌: 마지막 update 와 finish 사이의 네트워크 지연
+        since = min(2.0, max(0.0, now - p["moved"])) if p["moved"] else 0.0
+        need = laps - FINISH_SLACK - MAX_LAPS_PER_SEC * since
+        if lap < laps or p["progress"] < need or elapsed < MIN_LAP_SEC * laps:
             return 400, {"error": "완주가 확인되지 않았어요"}
         room["finish_order"].append(pid)
         p["rank"] = len(room["finish_order"])
         p["time_ms"] = int(elapsed * 1000)
-        p["progress"] = max(p["progress"], float(body.get("progress", 0)))
+        p["progress"] = max(p["progress"], float(laps))
         if p["rank"] == 1:
             room["first_finish_at"] = now
         bump()
@@ -343,14 +426,14 @@ def api_finish(body):
 
 def api_settings(body):
     with lock:
-        if body.get("id") not in room["players"]:
+        if not authed(body, body.get("id")):
             return 403, {"error": "참가한 플레이어만 바꿀 수 있어요"}
         if room["phase"] != "lobby":
             return 409, {"error": "대기실에서만 바꿀 수 있어요"}
         st = room["settings"]
         try:
             if "laps" in body:
-                st["laps"] = max(1, min(9, int(body["laps"])))
+                st["laps"] = int(max(1, min(9, num(body["laps"]))))
         except (TypeError, ValueError):
             pass
         if body.get("difficulty") in ("easy", "normal", "hard"):
@@ -362,6 +445,8 @@ def api_settings(body):
 
 def api_reset(body):
     with lock:
+        if not authed(body, body.get("id")):
+            return bad_auth()
         if room["phase"] == "finished" or not room["players"]:
             reset_room()
         touch(body.get("id"))
@@ -381,7 +466,11 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def send_json(self, code, obj):
-        data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        try:  # NaN/Infinity 는 브라우저 JSON.parse 가 못 읽으니 절대 내보내지 않음
+            data = json.dumps(obj, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        except ValueError:
+            code, data = 500, b'{"error": "server error"}'
+
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
@@ -389,7 +478,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def read_body(self):
-        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return {}
         if n <= 0 or n > 10000:
             return {}
         try:
@@ -405,7 +497,11 @@ class Handler(SimpleHTTPRequestHandler):
             ids = ",".join(q.get("ids", []) + q.get("id", [])).split(",")
             return self.send_json(*api_state([i for i in ids if i][:MAX_PLAYERS]))
         if u.path == "/api/leaderboard":
-            return self.send_json(200, leaderboard())
+            try:
+                laps = int(max(1, min(9, num(parse_qs(u.query).get("laps", [None])[0], LAPS))))
+            except (TypeError, ValueError):
+                laps = LAPS
+            return self.send_json(200, leaderboard(laps))
         if u.path.startswith("/api/"):
             return self.send_json(404, {"error": "not found"})
         return super().do_GET()
@@ -419,7 +515,15 @@ class Handler(SimpleHTTPRequestHandler):
         fn = routes.get(urlparse(self.path).path)
         if not fn:
             return self.send_json(404, {"error": "not found"})
-        self.send_json(*fn(self.read_body()))
+        body = self.read_body()
+        if "id" in body and body["id"] is not None and not isinstance(body["id"], str):
+            return self.send_json(400, {"error": "잘못된 요청이에요"})
+        try:
+            res = fn(body)
+        except Exception as e:  # 예상 못 한 입력이어도 응답 없이 끊지 않음
+            print("요청 처리 오류:", repr(e))
+            res = (400, {"error": "잘못된 요청이에요"})
+        self.send_json(*res)
 
 
 def lan_ip():
