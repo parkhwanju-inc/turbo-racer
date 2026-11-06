@@ -174,9 +174,18 @@ function newLocal(o) {
 }
 
 // ---------------------------------------------------------------- 네트워크
+// 응답 없이 멈춘 요청은 이 시간 뒤 끊는다. 안 끊으면 busy 가 안 풀려 폴링이 영원히 멈춤 (#11)
+const API_TIMEOUT_MS = 4000;
+function timeoutSignal() {
+  if (AbortSignal.timeout) return AbortSignal.timeout(API_TIMEOUT_MS);
+  const c = new AbortController();
+  setTimeout(() => c.abort(), API_TIMEOUT_MS);
+  return c.signal;
+}
+
 async function api(path, body) {
   const t0 = Date.now();
-  const res = await fetch(path, body === undefined ? {} : {
+  const res = await fetch(path, body === undefined ? { signal: timeoutSignal() } : { signal: timeoutSignal(),
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -215,8 +224,22 @@ async function netTick() {
 }
 setInterval(netTick, 30);
 
+// 서버 응답이 한동안 없으면 화면 위에 "다시 연결하는 중…" 표시 (#11)
+let lastNetOk = Date.now();
+const netMsg = document.body.appendChild(el("div", {
+  textContent: "서버와 연결이 끊겼어요 · 다시 연결하는 중…",
+  style: { display: "none", position: "fixed", top: "8px", left: "50%", transform: "translateX(-50%)", zIndex: 20,
+           padding: "6px 14px", borderRadius: "8px", background: "rgba(0,0,0,.8)", color: "#ffd23d",
+           font: "bold 14px sans-serif", pointerEvents: "none" },
+}));
+setInterval(() => {
+  const down = screen !== "join" && locals.length > 0 && Date.now() - lastNetOk > 2500;
+  netMsg.style.display = down ? "block" : "none";
+}, 250);
+
 function onState(s) {
   S = s;
+  lastNetOk = Date.now();
   if (screen === "join") return;
   const ids = new Set(s.players.map((p) => p.id));
   const before = locals.length;
