@@ -15,12 +15,13 @@
 const crypto = require("crypto");
 
 const { TOOLS, TOOL_BY_NAME, checkArgs, ToolError } = require("../lib/turbo-tools");
+const extras = require("../lib/mcp-extras"); // 리소스·프롬프트
 
 const clean = (v) => (v || "").replace(/^[\uFEFF\s]+|[\uFEFF\s]+$/g, "");
 const ADMIN_KEY = clean(process.env.MCP_ADMIN_KEY);
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-const SERVER_INFO = { name: "turbo-racer", title: "터보 레이서", version: "1.0.0" };
+const SERVER_INFO = { name: "turbo-racer", title: "터보 레이서", version: "1.1.0" };
 
 // ---------------------------------------------------------------- 인증
 function isAdmin(req) {
@@ -51,7 +52,11 @@ async function handleMessage(msg, ctx) {
       const asked = params && params.protocolVersion;
       return rpcResult(id, {
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
-        capabilities: { tools: { listChanged: false } },
+        capabilities: {
+          tools: { listChanged: false },
+          prompts: { listChanged: false },
+          resources: { subscribe: false, listChanged: false },
+        },
         serverInfo: SERVER_INFO,
         instructions: "터보 레이서(브라우저 멀티플레이 자동차 경주) 정보를 조회합니다. "
           + "방 상태·명예의 전당·최근 레이스·플레이어 전적은 누구나 볼 수 있고, "
@@ -86,9 +91,35 @@ async function handleMessage(msg, ctx) {
       }
     }
     case "resources/list":
-      return rpcResult(id, { resources: [] });
+      return rpcResult(id, { resources: extras.listResources() });
+    case "resources/templates/list":
+      return rpcResult(id, { resourceTemplates: extras.TEMPLATES });
+    case "resources/read": {
+      try {
+        const out = await extras.readResource(params && params.uri);
+        if (!out) return rpcError(id, -32002, `Resource not found: ${params && params.uri}`);
+        return rpcResult(id, out);
+      } catch (e) {
+        if (e instanceof ToolError) return rpcError(id, -32603, e.message);
+        console.error(e);
+        return rpcError(id, -32603, "서버 오류");
+      }
+    }
     case "prompts/list":
-      return rpcResult(id, { prompts: [] });
+      return rpcResult(id, { prompts: extras.listPrompts(ctx.admin) });
+    case "prompts/get": {
+      const p = extras.PROMPT_BY_NAME[params && params.name];
+      if (!p || (p.admin && !ctx.admin)) return rpcError(id, -32602, `Unknown prompt: ${params && params.name}`);
+      const args = (params && params.arguments) || {};
+      if (typeof args !== "object" || Array.isArray(args)) return rpcError(id, -32602, "arguments 는 객체여야 해요");
+      try {
+        return rpcResult(id, { description: p.description, messages: await p.build(args) });
+      } catch (e) {
+        if (e instanceof ToolError) return rpcError(id, -32602, e.message);
+        console.error(e);
+        return rpcError(id, -32603, "서버 오류");
+      }
+    }
     default:
       return rpcError(id, -32601, `Method not found: ${method}`);
   }
