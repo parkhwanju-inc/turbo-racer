@@ -384,7 +384,8 @@ $("addBotBtn").onclick = async () => {
 $("startBtn").onclick = async () => {
   try { onState(await api("/api/start", { id: humans()[0].id })); } catch (e) { alert(e.message); }
 };
-$("leaveBtn").onclick = () => {
+// 대기실·레이스·결과 화면의 나가기가 모두 이걸 쓴다.
+function leaveRoom() {
   // 화면과 로컬 상태를 먼저 정리한다. leave 응답을 기다리는 동안 폴링 응답이 먼저 오면
   // onState 가 "우리 플레이어가 사라졌다"고 보고 연결 끊김 오류를 띄우기 때문 (#18).
   // join 화면에서는 netTick 이 멈추고 onState 도 화면을 바꾸지 않는다.
@@ -392,9 +393,31 @@ $("leaveBtn").onclick = () => {
   netGen++;
   locals = [];
   saveLocals();
+  pressed.clear();
   show("join");
   $("joinErr").textContent = "";
   for (const l of leaving) api("/api/leave", { id: l.id }).catch(() => {});
+}
+$("leaveBtn").onclick = leaveRoom;
+$("resultLeaveBtn").onclick = leaveRoom;
+
+// 레이스 중에는 실수로 눌러 리타이어되지 않게 한 번 더 눌러야 나간다 (#23).
+// confirm() 은 페이지를 멈춰서(#20 과 같은 문제) 쓰지 않는다.
+const GAME_LEAVE_TEXT = "✕ 나가기";
+let gameLeaveArmedAt = -1e9;
+$("gameLeaveBtn").onclick = (e) => {
+  const b = e.currentTarget;
+  b.blur(); // 포커스가 남으면 Space/Enter(부스터 키)가 버튼을 다시 누른다
+  const racing = S && S.phase === "racing" && locals.some((l) => l.car && !l.car.finished);
+  if (racing && performance.now() - gameLeaveArmedAt > 3000) {
+    gameLeaveArmedAt = performance.now();
+    b.textContent = "한 번 더 누르면 리타이어";
+    setTimeout(() => { if (performance.now() - gameLeaveArmedAt >= 3000) b.textContent = GAME_LEAVE_TEXT; }, 3000);
+    return;
+  }
+  gameLeaveArmedAt = -1e9;
+  b.textContent = GAME_LEAVE_TEXT;
+  leaveRoom();
 };
 
 // ---------------------------------------------------------------- 결과
@@ -1043,6 +1066,49 @@ document.querySelectorAll("#touch button").forEach((b) => {
   b.addEventListener("pointercancel", off);
   b.addEventListener("contextmenu", (e) => e.preventDefault());
 });
+
+// ---------------------------------------------------------------- 탭 닫기 / 다른 페이지로 이동
+// 대기실에서 탭을 닫으면 10초 동안 목록에 남아 그사이 시작하면 출발 그리드를 차지한다 (#23).
+// pagehide 에서 sendBeacon 으로 바로 나간다. pagehide 는 새로고침에도 오므로, 같은 탭에
+// 다시 들어오면(새로고침·뒤로 가기) sessionStorage 에 남긴 이름·색으로 다시 참가한다.
+// 레이스/결과 중에는 보내지 않는다: 그때 나가면 새로고침해도 이어서 달리거나 결과를 볼 수 없다
+// (서버가 레이스 중 참가를 막음). 그 경우는 지금처럼 10초 뒤 리타이어/제외된다.
+const REJOIN_KEY = "tr_rejoin";
+window.addEventListener("pagehide", () => {
+  if (screen === "join" || !locals.length || !S || S.phase !== "lobby") return;
+  const back = locals.map((l) => ({ name: pinfo(l.id).name, color: pinfo(l.id).color, ai: l.ai }));
+  for (const l of locals) {
+    const body = { id: l.id };
+    if (l.token) body.tokens = { [l.id]: l.token };
+    navigator.sendBeacon("/api/leave", new Blob([JSON.stringify(body)], { type: "application/json" }));
+  }
+  try { sessionStorage.setItem(REJOIN_KEY, JSON.stringify(back)); } catch (e) { /* ignore */ }
+  netGen++;
+  locals = [];
+  saveLocals();
+  show("join");
+});
+async function rejoinAfterPagehide() {
+  let back = null;
+  try { back = JSON.parse(sessionStorage.getItem(REJOIN_KEY)); sessionStorage.removeItem(REJOIN_KEY); }
+  catch (e) { /* ignore */ }
+  if (!Array.isArray(back) || !back.length || locals.length) return;
+  // 이전 페이지의 leave 비콘이 먼저 처리되게 잠깐 기다린다. 아니면 옛 플레이어가 아직 색을
+  // 쥐고 있어서 다른 색으로 들어간다.
+  await new Promise((r) => setTimeout(r, 300));
+  if (locals.length) return;
+  for (const b of back) {
+    try { await addLocal({ name: b.name, color: b.color, ai: b.ai }); }
+    catch (e) {
+      if (humans().length) continue; // 같은 PC 친구/컴퓨터 하나가 안 들어가도 나머지는 계속
+      show("join");
+      $("joinErr").textContent = e.message;
+      return;
+    }
+  }
+}
+rejoinAfterPagehide();
+window.addEventListener("pageshow", (e) => { if (e.persisted) rejoinAfterPagehide(); });
 
 // ---------------------------------------------------------------- 시작: 새로고침이면 재접속
 (async () => {

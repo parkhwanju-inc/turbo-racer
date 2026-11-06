@@ -63,6 +63,7 @@
 <section id="game" class="screen">
   <canvas id="cv"></canvas>
   <ol id="liveRank"></ol>
+  <button id="gameLeaveBtn" tabindex="-1">✕ 나가기</button>
   <div id="center"></div>
   <div id="touch">
     <div class="tleft">
@@ -82,7 +83,10 @@
     <table class="tbl"><thead><tr><th>등수</th><th>이름</th><th>기록</th></tr></thead>
       <tbody id="resultRows"></tbody></table>
     <button id="againBtn" class="big">다시 하기</button>
-    <button class="link" data-show-board>🏆 명예의 전당</button>
+    <div class="row">
+      <button class="link" data-show-board>🏆 명예의 전당</button>
+      <button id="resultLeaveBtn" class="link">나가기</button>
+    </div>
   </div>
 </section>
 
